@@ -20,8 +20,9 @@
   joint_trajectory_command_broadcaster:
     ros__parameters:
       enable_teleoperation: true
+      sync_threshold: 0.03
       output_topic_suffix: raw_joint_trajectory
-      default_control_mode: 1
+      default_control_mode: 2
       default_left_preset_id: 1
       default_right_preset_id: 1
       left_joints:
@@ -107,6 +108,6 @@
       joint_states_topic: "/joint_states"
       sensorxel_l_joy_joint_trajectory_topic: "/leader/joystick_controller_left/joint_trajectory"
       sensorxel_r_joy_joint_trajectory_topic: "/leader/joystick_controller_right/joint_trajectory"
-      sensorxel_l_joy_jog_scale: 0.06
-      sensorxel_r_joy_jog_scale: 0.01
+      sensorxel_l_joy_jog_scale: 0.0
+      sensorxel_r_joy_jog_scale: 0.0
       deadzone: 0.05

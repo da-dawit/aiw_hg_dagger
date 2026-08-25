@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <atomic>
 #include <map>
 
 #include "controller_interface/controller_interface.hpp"
@@ -31,6 +32,7 @@
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "trajectory_msgs/msg/joint_trajectory.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 
@@ -126,6 +128,14 @@ protected:
   sensor_msgs::msg::JointState current_joint_states_;
   bool was_active_ = false;  // Track previous sensorxel_joy state
   bool has_joint_states_ = false;  // Track if joint states have been received
+  // While true, this controller stays silent on its own joint_trajectory
+  // publishers -- see home_in_progress_subscriber_ below.
+  std::atomic<bool> home_in_progress_{false};
+  // update()-thread-only mirror of home_in_progress_, used to detect the
+  // falling edge there instead of in the subscription callback -- the
+  // re-capture below touches sensor_last_active_positions_, which is not
+  // safe to write from a different thread than update().
+  bool was_home_in_progress_ = false;
 
   std::map<std::string, std::vector<std::string>> sensor_controlled_joints_;
   std::map<std::string, std::vector<std::string>> sensor_reverse_interfaces_;
@@ -141,6 +151,12 @@ protected:
   std::map<std::string, double> sensor_jog_scale_;
 
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_subscriber_;
+  // UI-driven Home Pose publishes a one-shot trajectory to the exact same
+  // topics this controller writes to every control-loop tick -- without
+  // this, the controller's own idle republish (even at jog_scale=0, it
+  // still resends the last-held position) overwrites the home command
+  // within ~10ms, so the arm never visibly reaches it.
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr home_in_progress_subscriber_;
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;

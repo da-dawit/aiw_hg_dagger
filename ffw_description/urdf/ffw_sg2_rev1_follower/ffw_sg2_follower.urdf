@@ -675,7 +675,8 @@
     <child link="head_link1"/>
     <origin rpy="0 0 0" xyz="0.049483 0 0.102130"/>
     <axis xyz="0 1 0"/>
-    <limit effort="1000" lower="-0.2317" upper="0.6951" velocity="4.8"/>
+    <!-- Kept in sync with ffw_follower_body.xacro; see the note there. -->
+    <limit effort="1000" lower="-0.2317" upper="0.90" velocity="4.8"/>
     <dynamics damping="0.1"/>
   </joint>
   <link name="head_link1">
