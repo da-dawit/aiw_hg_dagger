@@ -8,7 +8,7 @@
         type: joint_state_broadcaster/JointStateBroadcaster
 
       joint_trajectory_command_broadcaster:
-        type: leader_joint_trajectory_command_broadcaster/LeaderJointTrajectoryCommandBroadcaster
+        type: joint_trajectory_command_broadcaster/A2JointTrajectoryCommandBroadcaster
 
       spring_actuator_controller:
         type: spring_actuator_controller/SpringActuatorController
@@ -22,7 +22,7 @@
       enable_teleoperation: true
       sync_threshold: 0.03
       output_topic_suffix: raw_joint_trajectory
-      default_control_mode: 1
+      default_control_mode: 2
       default_left_preset_id: 1
       default_right_preset_id: 1
       left_joints:
@@ -100,14 +100,27 @@
       joystick_calibration_min: 0.0
       joystick_calibration_center: 2048.0
       joystick_calibration_max: 4096.0
-      sensorxel_l_joy_controlled_joints:
-        - head_joint1
-        - head_joint2
+      # Non-empty list only to satisfy rclcpp's parameter type inference --
+      # [] here crashes joystick_controller's on_configure (see
+      # sensorxel_l_joy_joint_trajectory_topic's comment for why this
+      # publisher must never point at the real head_controller topic
+      # regardless of what's listed here).
+      sensorxel_l_joy_controlled_joints: [head_joint1, head_joint2]
       sensorxel_r_joy_controlled_joints:
         - lift_joint
       joint_states_topic: "/joint_states"
-      sensorxel_l_joy_joint_trajectory_topic: "/leader/joystick_controller_left/joint_trajectory"
+      # This controller republishes last_active_positions every control tick
+      # (~100Hz) regardless of jog_scale/deadzone -- with jog_scale 0.0 that
+      # value never usefully changes, but the stream itself never stops.
+      # head_controller's own /head_controller/joint_trajectory topic is
+      # remapped onto whatever this points at, so pointing it at that real
+      # topic means this 100Hz stream preempts any other head command (e.g.
+      # head_joint_trajectory_executor's home move) within ~10ms, every
+      # time. Redirected to a dead-end topic nothing subscribes to -- costs
+      # nothing since jog_scale=0 already made this publisher functionally
+      # useless for actually moving the head.
+      sensorxel_l_joy_joint_trajectory_topic: "/leader/joystick_controller_left/unused_head_trajectory"
       sensorxel_r_joy_joint_trajectory_topic: "/leader/joystick_controller_right/joint_trajectory"
-      sensorxel_l_joy_jog_scale: 0.06
-      sensorxel_r_joy_jog_scale: 0.01
+      sensorxel_l_joy_jog_scale: 0.0
+      sensorxel_r_joy_jog_scale: 0.0
       deadzone: 0.05

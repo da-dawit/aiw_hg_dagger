@@ -1,8 +1,6 @@
 cyclo_teleoperation:
   ros__parameters:
-    robot:
-      plugin: cyclo_teleoperation/AIWorkerTeleoperation
-      parameter_prefix: ""
+    robot_type: ai_worker
 
     follower_joint_states_topic: /joint_states
     right_leader_topic: /leader/joint_trajectory_command_broadcaster_right/raw_joint_trajectory
@@ -22,43 +20,99 @@ cyclo_teleoperation:
     leader_left_eef: arm_l_link7
 
     available_control_modes: [1, 2]
-    default_control_mode: 1
+    default_control_mode: 2
 
     control_modes:
       "1":
         name: teleoperation
-        plugin: cyclo_teleoperation/MoveJMode
+        plugin: cyclo_teleoperation/AiWorkerMoveJMode
         slow_start:
           enabled: true
         initial_pose:
-          enabled: false
-        exit_pose:
-          enabled: false
-
-      "2":
-        name: relative_pose
-        plugin: cyclo_teleoperation/RelativePoseMode
-        slow_start:
-          enabled: false
-        initial_pose:
           enabled: true
-          step_names: [step0, step1]
+          step_names: [step0]
           steps:
             step0:
               left:
-                positions: [1.57, 0.0, 0.0, -2.5, 0.0, 0.0, 0.0]
+                positions: [0.355859574339658, 0.088958901472462, 0.026029736494434,-1.926655901134555, 0.102728775888717, -0.030667631532807,-0.236175368706907]
               right:
-                positions: [1.57, 0.0, -0.0, -2.5, 0.0, 0.0, 0.0]
-            step1:
-              left:
-                positions: [0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
-              right:
-                positions: [0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
+                positions: [0.417206821630178, -0.035245605446654, 0.013757890191349,-1.923611908008594, -0.058279285714749, -0.044485442848684,0.233144959990851]
+            # step1:
+            #   left:
+            #     positions: [0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
+            #   right:
+            #     positions: [0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
           duration: 3.0
           completion_tolerance: 0.1
           timeout: 30.0
         exit_pose:
           enabled: false
+
+      "2":
+        name: elbow_up_leader
+        plugin: cyclo_teleoperation/AiWorkerElbowUpLeaderMode
+        # RELATIVE-DELTA teleop. On engage this mode captures a leader anchor
+        # and a follower anchor, then commands
+        #     goal = follower_anchor + (leader_now - leader_anchor)
+        # so the follower moves BY the leader's change rather than TO its pose.
+        # Nothing jumps at engage even if leader and follower are far apart --
+        # unlike mode 1, which relays absolute leader positions.
+        #
+        # "Elbow up" is only a weighted nullspace preference
+        # (output.preferred_joint_velocity_weight = elbow_weight). 0.0 removes
+        # that bias and leaves pure delta control. Restore 1.0 to bring the
+        # elbow-up posture back.
+        elbow_weight: 0.0
+        # First-trial safety clamps. These are declared parameters of the mode
+        # (see onConfigure), so they are config-only -- no rebuild.
+        #   max_joint_velocity: hard ceiling on commanded joint speed [rad/s].
+        #     Default is 1.0; 0.3 keeps a mistake slow enough to react to.
+        #   kp_*: how hard the solver chases the delta goal. Lower = softer,
+        #     less overshoot on a fast leader movement. Defaults are 50.0.
+        max_joint_velocity: 1.5
+        kp_position: 70.0
+        kp_orientation: 70.0
+        slow_start:
+          enabled: false
+        initial_pose:
+          enabled: false
+          step_names: [step0, step1, step2]
+          steps:
+            step0:
+              left:
+                positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+              right:
+                positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            step1:
+              left:
+                positions: [0.0, 0.0, -3.14, 0.0, 1.57, 0.0, 0.0]
+              right:
+                positions: [0.0, 0.0, 3.14, 0.0, -1.57, 0.0, 0.0]
+            step2:
+              left:
+                positions: [-1.57, 0.0, -3.14, -1.57, 1.57, 0.0, 0.0]
+              right:
+                positions: [-1.57, 0.0, 3.14, -1.57, -1.57, 0.0, 0.0]
+          duration: 3.0
+          completion_tolerance: 0.1
+          timeout: 30.0
+        exit_pose:
+          enabled: false
+          step_names: [step0, step1]
+          steps:
+            step0:
+              left:
+                positions: [0.0, 0.0, -3.14, 0.0, 1.57, 0.0, 0.0]
+              right:
+                positions: [0.0, 0.0, 3.14, 0.0, -1.57, 0.0, 0.0]
+            step1:
+              left:
+                positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+              right:
+                positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          duration: 3.0
+          completion_tolerance: 0.1
+          timeout: 30.0
 
     available_presets: [1, 2]
 

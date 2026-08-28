@@ -1,4 +1,4 @@
-leader_joint_trajectory_command_broadcaster:
+a2_joint_trajectory_command_broadcaster:
   map_interface_to_joint_state:
     position: {
       type: string,

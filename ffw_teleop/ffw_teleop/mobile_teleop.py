@@ -40,8 +40,13 @@ class KeyboardTeleop(Node):
         super().__init__('keyboard_teleop')
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 5)
 
-        self.linear_speed = 0.4    # m/s
-        self.angular_speed = 0.8   # rad/s
+        # Override at launch, e.g.
+        #   ros2 run ffw_teleop mobile_teleop --ros-args \
+        #       -p linear_speed:=0.1 -p angular_speed:=0.3
+        self.declare_parameter('linear_speed', 0.15)   # m/s
+        self.declare_parameter('angular_speed', 0.4)   # rad/s
+        self.linear_speed = self.get_parameter('linear_speed').value
+        self.angular_speed = self.get_parameter('angular_speed').value
 
         self.get_logger().info(
             '\nKeyboard Teleop\n'
@@ -50,6 +55,8 @@ class KeyboardTeleop(Node):
             'A/D : Turn Left / Right\n'
             'Space: Stop\n'
             'Ctrl+C: Quit\n'
+            f'speeds: linear {self.linear_speed} m/s, '
+            f'angular {self.angular_speed} rad/s\n'
         )
 
     def run(self):

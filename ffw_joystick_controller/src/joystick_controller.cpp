@@ -427,6 +427,32 @@ controller_interface::return_type JoystickController::update(
     return controller_interface::return_type::OK;
   }
 
+  // Falling edge of home_in_progress_: this controller stayed silent on its
+  // joint_trajectory publishers for the whole home move (see the publish
+  // guard below), so sensor_last_active_positions_ is still whatever it was
+  // BEFORE the move -- the next publish would otherwise snap straight back
+  // to that stale pre-home position. Re-capture from the real, now-home
+  // joint state. (Confirmed live 2026-08-24: this is exactly what happened
+  // releasing home_in_progress by hand before this fix existed.)
+  const bool home_now = home_in_progress_;
+  if (was_home_in_progress_ && !home_now && !current_joint_states_.name.empty()) {
+    for (const auto & sensor_name : sensorxel_joy_names_) {
+      const auto & controlled_joints = sensor_controlled_joints_[sensor_name];
+      auto & last_active_positions = sensor_last_active_positions_[sensor_name];
+      for (size_t i = 0; i < controlled_joints.size(); ++i) {
+        auto it = std::find(current_joint_states_.name.begin(), current_joint_states_.name.end(),
+            controlled_joints[i]);
+        if (it != current_joint_states_.name.end()) {
+          size_t index = std::distance(current_joint_states_.name.begin(), it);
+          if (i < last_active_positions.size()) {
+            last_active_positions[i] = current_joint_states_.position[index];
+          }
+        }
+      }
+    }
+  }
+  was_home_in_progress_ = home_now;
+
   bool swerve_mode = (current_mode_ == constants::SWERVE_MODE);
   JoystickValues joystick_values;
   bool left_tact_switch_pressed = false;
@@ -483,7 +509,9 @@ controller_interface::return_type JoystickController::update(
         positions = last_active_positions;
       }
 
-      publish_joint_trajectory(controlled_joints, positions, sensor_name);
+      if (!home_in_progress_) {
+        publish_joint_trajectory(controlled_joints, positions, sensor_name);
+      }
     }
 
     was_active_ = any_sensorxel_joy_active;
@@ -607,6 +635,14 @@ controller_interface::CallbackReturn JoystickController::on_configure(
   joint_states_subscriber_ = get_node()->create_subscription<sensor_msgs::msg::JointState>(
     params_.joint_states_topic, rclcpp::SystemDefaultsQoS(),
     std::bind(&JoystickController::joint_states_callback, this, std::placeholders::_1));
+
+  auto home_in_progress_qos =
+    rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  home_in_progress_subscriber_ = get_node()->create_subscription<std_msgs::msg::Bool>(
+    "/leader/teleoperation/home_in_progress", home_in_progress_qos,
+    [this](const std_msgs::msg::Bool::SharedPtr message) {
+      home_in_progress_ = message->data;
+    });
 
   // Create publisher for mode
   mode_pub_ = get_node()->create_publisher<std_msgs::msg::String>(
