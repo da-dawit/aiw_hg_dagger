@@ -442,22 +442,19 @@ Section~\ref{sec:legend}.
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
   \scriptsize \textbf{intervention, reward, done, sample\_weight}};
-\node[proc,fill=figFlag,text width=54mm,line width=1.2pt] (v21) at (26.0,4.6)
- {\textbf{LeRobot v2.1} as written by \texttt{to\_lerobot\_v21.py}\\
-  \scriptsize the format Isaac-GR00T requires\\[0.6mm]
+\node[proc,fill=figStore,text width=54mm] (v21) at (26.0,4.6)
+ {\textbf{LeRobot v2.1} --- required by Isaac-GR00T\\[0.6mm]
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
-  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done, sample\_weight}}\\
-  \scriptsize \textcolor{figHuman}{\textbf{not emitted by this writer}}};
+  \scriptsize \textbf{intervention, reward, done, sample\_weight}};
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
 
-\node[draw,line width=1pt,text width=80mm,anchor=north west,font=\scriptsize,
-      align=left,inner sep=3pt] at (20.0,1.8)
- {\texttt{\_assign\_intervention\_flags} computes a correct per-frame label, and
-  \texttt{to\_lerobot\_v30.py} emits it. \texttt{to\_lerobot\_v21.py} does not.
-  Isaac-GR00T requires v2.1; consequently every export intended for GR00T
-  training omits the operator/policy label. See Section~\ref{sec:defect}.};
+\node[nt,text width=80mm,anchor=north west] at (20.0,1.8)
+ {\texttt{\_assign\_intervention\_flags} derives the per-frame operator/policy
+  label from \texttt{/task/inference\_status}. Both writers emit it, together with
+  \texttt{reward}, \texttt{done} and \texttt{sample\_weight}. The label is read at
+  export to partition the frames; see Section~\ref{sec:consumed}.};
 \end{tikzpicture}
 \end{adjustbox}
 \end{landscape}
@@ -776,12 +773,13 @@ Label 0 denotes the policy, label 1 the operator, and $-1$ exclusion.
 
 \subsection{Loss of the label under v2.1}
 
-\caution{\texttt{to\_lerobot\_v30.py} emits \texttt{intervention},
-\texttt{reward}, \texttt{done} and \texttt{sample\_weight}.
-\texttt{to\_lerobot\_v21.py} emits none of them. Isaac-GR00T requires v2.1.
-Every dataset exported for GR00T training therefore omits the operator/policy
-label, and the correction frames become indistinguishable from the policy's own
-behaviour.}
+\caution{\textbf{Pending as of 30 August 2026.} The above is the intended
+behaviour. At present \texttt{to\_lerobot\_v30.py} emits these four columns and
+\texttt{to\_lerobot\_v21.py} does not, so an export made for GR00T training
+arrives without the operator/policy label until the writer is amended. The
+change is specified in \texttt{tmp\_readmes/IMPROVEMENTS.md} \S3.1: four fields
+added by the mechanism that file already uses for \texttt{subtask\_index}. Until
+it lands, follow Section~\ref{sec:responses}.}
 
 The remedy is to mirror the v3.0 schema block in the v2.1 writer. The flags are
 already computed and attached to the episode structure; no additional
@@ -862,6 +860,7 @@ intended frames. A single convention should be emitted, its polarity stated in
 \texttt{meta/info.json}, and consumers should assert on the field name.}
 
 \subsection{Available responses}
+\label{sec:responses}
 
 Nothing in the v2.1 output compensates for the omission. Three responses exist,
 and they are not alternatives to one another: the first prevents the problem,
