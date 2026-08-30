@@ -87,6 +87,30 @@ Current confirmed-correct value: `head_joint1 = 0.782330201821470`, `head_joint2
 
 ## 4. HG-DAgger gate operation (freeze / pause-resume)
 
+### The takeover loop, in the order you actually do it
+
+Assume the policy is running a rollout.
+
+1. **Joystick drag-down, hold ~1 s** → policy stops. INFERENCING → **PAUSED**.
+2. **Press tact** on the arm you want → that arm engages. You are now driving, and these are
+   the frames HG-DAgger trains on.
+3. **Press tact again** → that arm disengages. The gripper holds its teleoped value.
+4. **Joystick drag-down, hold ~1 s** → policy resumes. PAUSED → **INFERENCING**.
+
+The tact is a *toggle* — same button engages and stops. The drag-down gesture is also one
+topic with two meanings (`/leader/teleoperation/toggle_pause_request`, `std_msgs/Empty`); the
+orchestrator decides pause-vs-resume from the phase it is currently in.
+
+The gaps between steps 1→2 and 3→4 — policy paused, no arm engaged, nobody driving — are
+labelled `-1` and excluded from training. That is correct and expected; you do not need to rush.
+
+**Engage does not sweep.** SG2 runs control mode 2 (relative delta): on engage it captures a
+leader anchor and a follower anchor and commands
+`goal = follower_anchor + (leader_now - leader_anchor)`. Nothing jumps even if the leader and
+follower are far apart. Mode 1 (absolute MoveJ) *does* sweep, which is why `slow_start` is
+enabled there and disabled in mode 2.
+
+
 The `arm_freeze_gate` process (auto-started by the follower launch) is the single point that decides whether the arms follow the human (teleop) or the AI policy, and can freeze both arms instantly.
 
 **Gestures** (push the leader joystick down and hold ~0.8s, then **release** — don't hold it down, there's a 2-second cooldown so each push is one toggle):
@@ -171,6 +195,12 @@ docker exec cyclo_intelligence bash -lc 'source /opt/ros/jazzy/setup.bash; sourc
 
 Notes:
 - `fps: 30` should always be passed explicitly (matches this robot's actual camera/inference rate). Leaving it `0`/default now correctly resolves to `30` too (this was a bug — used to silently default to `15` — now fixed).
+> **The v2.1 export drops the online-RL labels.** `to_lerobot_v30.py` writes `intervention`,
+> `reward`, `done` and `sample_weight`; `to_lerobot_v21.py` does not. Isaac-GR00T requires v2.1,
+> so a v2.1-only export of an online-RL session arrives at training with **no record of which
+> frames were yours**. Until that is fixed (`tmp_readmes/IMPROVEMENTS.md` §3), **always convert
+> v3.0 as well and keep it** — it is the only copy that has the labels.
+
 - `convert_v21: false, convert_v30: false` — both false means "run both formats." Isaac-based tooling needs **v2.1** specifically (v3.0's file layout is incompatible with it), so if you only need one, request `convert_v21: true` explicitly.
 - Poll progress via `/data/convert/status` with the `job_id` the start call returns.
 

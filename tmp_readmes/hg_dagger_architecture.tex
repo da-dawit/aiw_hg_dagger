@@ -1,7 +1,24 @@
 % HG-DAgger / Online-RL system architecture -- FFW SG2 + A2 leader
-% Compile: pdflatex (or Overleaf, default settings). No exotic packages.
+% Compile: pdflatex, xelatex or tectonic. No exotic packages.
+%
+% LAYOUT NOTE (2026-08-30 rewrite)
+% The previous version put the runtime control path and the recording/conversion
+% path on one a3 canvas. That forced every cross-container edge through the same
+% narrow corridor and several labels landed on node text: T15/T1 crossing on the
+% left, T14 over the broadcaster, "policy input drops it" struck through by an
+% edge, T10 over the browser caption, the cyclo container label colliding.
+%
+% This version separates the two concerns:
+%   page 1  RUNTIME  -- who commands the arms, and how control is handed over
+%   page 2  DATA     -- what is recorded and what survives conversion
+%   page 3+ LEGEND   -- every topic and service, type and semantics
+%
+% Nodes sit on an ABSOLUTE grid (x=1cm, y=1cm) rather than relative
+% "below=of" chains, so one node can be nudged without cascading through
+% everything downstream. Cross-container edges leave from a named anchor and
+% turn in open space rather than over a node.
 \documentclass{article}
-\usepackage[a3paper,landscape,margin=1.5cm]{geometry}
+\usepackage[a3paper,landscape,margin=1.2cm]{geometry}
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage{longtable}
@@ -10,280 +27,292 @@
 \usepackage{helvet}
 \renewcommand{\familydefault}{\sfdefault}
 \usepackage{xcolor}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
 
-\definecolor{cAiWorker}{RGB}{224,242,254}
-\definecolor{cCyclo}{RGB}{254,242,224}
-\definecolor{cPolicy}{RGB}{237,233,254}
-\definecolor{cUI}{RGB}{220,252,231}
-\definecolor{cDisk}{RGB}{243,244,246}
+\definecolor{cAiWorker}{RGB}{225,240,255}
+\definecolor{cCyclo}{RGB}{255,238,215}
+\definecolor{cPolicy}{RGB}{232,225,255}
+\definecolor{cUI}{RGB}{225,250,230}
+\definecolor{cDisk}{RGB}{238,238,238}
+\definecolor{cBad}{RGB}{255,226,226}
+\definecolor{eHuman}{RGB}{178,58,58}
+\definecolor{eAuto}{RGB}{38,108,188}
+\definecolor{eData}{RGB}{95,95,95}
+
+\tikzset{
+  proc/.style   ={draw,rounded corners=2pt,align=center,font=\small,
+                  minimum height=9mm,inner sep=3pt,fill=white},
+  hw/.style     ={draw,dashed,rounded corners=2pt,align=center,font=\small,
+                  minimum height=8mm,inner sep=3pt,fill=white},
+  disk/.style   ={draw,align=center,font=\small,fill=cDisk,inner sep=3pt},
+  bad/.style    ={draw,align=center,font=\small,fill=cBad,inner sep=3pt,thick},
+  container/.style={draw,rounded corners=4pt,inner sep=5mm,line width=0.4pt},
+  ed/.style     ={-{Stealth[length=2mm]},draw=eData,line width=0.5pt},
+  human/.style  ={-{Stealth[length=2mm]},draw=eHuman,line width=1.1pt},
+  auto/.style   ={-{Stealth[length=2mm]},draw=eAuto,line width=1.1pt},
+  lbl/.style    ={font=\scriptsize,fill=white,inner sep=1pt},
+  note/.style   ={font=\scriptsize\itshape,align=left},
+}
 
 \begin{document}
-\pagestyle{empty}
 
+% =====================================================================
+% PAGE 1 -- RUNTIME
+% =====================================================================
 \begin{center}
-{\LARGE\bfseries HG-DAgger / Online-RL System Architecture --- FFW SG2}\\[2pt]
-{\small ai\_worker (leader + follower hardware) \quad$\cdot$\quad cyclo\_intelligence (orchestration) \quad$\cdot$\quad groot\_server (policy)}\\[2pt]
-{\scriptsize\it Edge labels are topic/service IDs -- p.2 walks each core data path step by step, p.3+ defines every ID}
+{\LARGE\bfseries HG-DAgger / Online-RL --- Runtime Control Path}\\[1mm]
+{\small FFW SG2 follower $\cdot$ A2 leader $\cdot$ GR00T-N1.7 policy}\\[1.5mm]
+{\footnotesize\itshape
+\textcolor{eHuman}{\rule{5mm}{1.2pt}}~human commands the arms \quad
+\textcolor{eAuto}{\rule{5mm}{1.2pt}}~policy commands the arms \quad
+\textcolor{eData}{\rule{5mm}{0.6pt}}~status / feedback / control plane.
+\ Edge labels are IDs defined in the legend on p.3.}
 \end{center}
-\vspace{4mm}
+\vspace{1mm}
 
-% The node-distance/positioning below produces a diagram roughly 30x18cm --
-% far smaller than an a3 page. \resizebox forces it to fill \textwidth
-% regardless of that native size, so it can never end up lost/invisible in
-% blank page space again (this happened once already at a2 landscape).
-\noindent\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[
-  node distance=13mm and 20mm,
-  proc/.style={draw, rounded corners, fill=white, minimum width=32mm, minimum height=9mm, align=center, font=\scriptsize},
-  hw/.style={draw, rounded corners, fill=white, minimum width=28mm, minimum height=8mm, align=center, font=\scriptsize, dashed},
-  container/.style={draw, rounded corners, inner sep=6mm, font=\bfseries\small},
-  topic/.style={-{Latex[length=2mm]}, font=\tiny, align=center},
-  svc/.style={-{Latex[length=2mm]}, dashed, font=\tiny, align=center},
-  diskbox/.style={draw, fill=cDisk, rounded corners, minimum width=30mm, minimum height=8mm, align=center, font=\scriptsize},
-]
+% width capped at 0.86 so the SCALED HEIGHT still fits the a3 text block --
+% \resizebox constrains one dimension only, and at full \textwidth this
+% picture's height overflowed and the page came out blank.
+\resizebox{0.86\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm]
 
-% ===================== ai_worker: LEADER =====================
-\node[hw] (leaderhw) {A2 Leader HW\\Dynamixel + joysticks + tact};
-\node[font=\tiny\itshape,align=left,right=6mm of leaderhw,text width=40mm] {Leader + follower can both\\stay up through a whole\\inference session -- T14 stops\\them contending on T6};
-\node[proc, below=of leaderhw] (a2joy) {a2\_joystick\_controller\\(ros2\_control)};
-\node[proc, below=of a2joy] (a2bcast) {a2\_joint\_trajectory\_\\command\_broadcaster};
-\node[proc, right=42mm of a2bcast] (teleop) {cyclo\_teleoperation\_node\\\tiny mode1 MoveJ / mode2 delta (T17 selects)\\gripper freeze on disengage};
-\node[proc, below=22mm of teleop, fill=yellow!25] (bridge) {leader\_bridge.py\\\tiny active\_arms bridge +\\\tiny pause/resume gesture};
+% ---------- ai_worker: leader chain ----------
+\node[hw]   (lhw)    at ( 2.6,14.4) {A2 Leader HW\\\scriptsize Dynamixel $\cdot$ 2 joysticks $\cdot$ tact};
+\node[proc] (joy)    at ( 2.6,12.4) {\texttt{a2\_joystick\_controller}\\\scriptsize ros2\_control};
+\node[proc] (bcast)  at ( 2.6,10.2) {\texttt{a2\_joint\_trajectory\_}\\\texttt{command\_broadcaster}\\\scriptsize the leader's own arm command};
+\node[proc] (bridge) at ( 2.6, 7.6) {\texttt{leader\_bridge.py}\\\scriptsize active\_arms bridge\\\scriptsize + pause/resume drag-gesture};
 
-% ===================== ai_worker: FOLLOWER =====================
-\node[hw, right=36mm of teleop] (followerhw) {SG2 Follower HW};
-\node[proc, below=of followerhw] (followerctrl) {Follower ros2\_control\\arm\_l/r, head, lift,\\swerve\_drive, joint\_state\_bcast};
-\node[proc, below=18mm of followerctrl] (cams) {Cameras\\ZED (head) + 2x D405 (wrist)\\\tiny 4 cams recorded (incl.\ cam\_right\_head);\\\tiny policy input drops it -- 3 cams only};
+% ---------- ai_worker: teleop + follower ----------
+\node[proc] (teleop) at ( 9.4,11.4) {\texttt{cyclo\_teleoperation\_node}\\\scriptsize mode 1 absolute MoveJ / mode 2 relative delta\\\scriptsize (T17 selects --- SG2 default is \textbf{mode 2})\\\scriptsize mode 2: goal $=$ follower\_anchor $+$ (leader\_now $-$ leader\_anchor)\\\scriptsize \textbf{slow\_start disabled} --- nothing sweeps on engage\\\scriptsize gripper holds its teleoped value on disengage};
+\node[hw]   (fhw)    at (18.2,14.4) {SG2 Follower HW\\\scriptsize 2 arms $\cdot$ head $\cdot$ lift $\cdot$ swerve base};
+\node[proc] (fctrl)  at (18.2,11.8) {Follower \texttt{ros2\_control}\\\scriptsize arm\_l / arm\_r / head / lift /\\\scriptsize swerve\_drive / joint\_state\_broadcaster};
+\node[proc] (cams)   at (18.2, 9.0) {Cameras\\\scriptsize ZED head L+R $\cdot$ 2$\times$ D405 wrist\\\scriptsize \textbf{4 recorded}, policy is fed \textbf{3}};
 
-\begin{pgfonlayer}{background}
-\node[container, fit=(leaderhw)(a2joy)(a2bcast)(teleop)(bridge)(followerhw)(followerctrl)(cams), fill=cAiWorker, label={[font=\bfseries]above left:ai\_worker container}] (aiworkerbox) {};
-\end{pgfonlayer}
+\begin{scope}[on background layer]
+\node[container,fill=cAiWorker,
+      fit=(lhw)(joy)(bcast)(bridge)(teleop)(fhw)(fctrl)(cams),
+      label={[font=\bfseries,anchor=north west]north west:ai\_worker container}] (awbox) {};
+\end{scope}
 
-% ===================== groot_server =====================
-\node[proc, right=38mm of followerhw, yshift=-10mm, minimum height=18mm] (policy) {groot\_server\\main\_runtime (control\_loop)\\+ engine\_process (GR00T-N1.7)\\\tiny TensorRT DiT, D=16 (arms only)\\\tiny + gripper hold: freeze commanded\\\tiny pos. once measured effort $\geq$ threshold\\\tiny for a dwell period (robot\_client.py)};
-\begin{pgfonlayer}{background}
-\node[container, fit=(policy), fill=cPolicy, label={[font=\bfseries]above:groot\_server container}] (policybox) {};
-\end{pgfonlayer}
+% ---------- groot_server ----------
+\node[proc,text width=56mm] (policy) at (25.0,12.0)
+  {\texttt{groot\_server}\\[1mm]
+   \scriptsize\texttt{main\_runtime} --- control loop\\
+   \scriptsize\texttt{engine\_process} --- GR00T-N1.7, TensorRT DiT\\[1mm]
+   \scriptsize reads observation (T7), writes action (T6)\\
+   \scriptsize \textbf{D $=$ 16, arms only} --- head/lift/base uncommanded\\
+   \scriptsize gripper hold: freeze commanded position once\\
+   \scriptsize measured effort $\geq$ threshold for a dwell\\
+   \scriptsize (\texttt{robot\_client.py})};
+\begin{scope}[on background layer]
+\node[container,fill=cPolicy,fit=(policy),
+      label={[font=\bfseries]north:groot\_server container}] (pbox) {};
+\end{scope}
 
-% ===================== cyclo_intelligence =====================
-% Deliberately far below the leader column (55mm, was 26mm) -- every edge
-% that crosses from ai_worker down into this box (T1, T5, T14, T16, T7) gets
-% its own horizontal lane through that gap instead of bunching into one
-% narrow corridor, which was the main source of clutter in the prior layout.
-\node[proc, below=55mm of a2bcast, xshift=-4mm] (orch) {orchestrator\_node};
-\node[proc, right=14mm of orch] (rosbridge) {rosbridge\_websocket\\(port 7090)};
-\node[proc, below=16mm of orch] (cyclodata) {cyclo\_data\_node\\\tiny rosbag\_recorder, convert,\\edit, hub services};
-\node[proc, right=14mm of cyclodata] (supapi) {supervisor\_api\\(FastAPI, port 7100 /api)};
+% ---------- cyclo_intelligence ----------
+\node[proc] (orch)   at ( 3.8, 3.9) {\texttt{orchestrator\_node}\\\scriptsize session + policy state machine};
+\node[proc] (rb)     at (10.6, 3.9) {\texttt{rosbridge\_websocket}\\\scriptsize port 7090};
+\node[proc] (cdata)  at ( 3.8, 1.5) {\texttt{cyclo\_data\_node}\\\scriptsize rosbag\_recorder / convert / edit / hub};
+\node[proc] (supapi) at (10.6, 1.5) {\texttt{supervisor\_api}\\\scriptsize FastAPI, port 7100 \texttt{/api}};
+\begin{scope}[on background layer]
+\node[container,fill=cCyclo,fit=(orch)(rb)(cdata)(supapi),
+      label={[font=\bfseries,anchor=south west]south west:cyclo\_intelligence container}] (cbox) {};
+\end{scope}
 
-\begin{pgfonlayer}{background}
-\node[container, fit=(orch)(rosbridge)(cyclodata)(supapi), fill=cCyclo, label={[font=\bfseries,label distance=3mm]below left:cyclo\_intelligence container}] (cyclobox) {};
-\end{pgfonlayer}
+% ---------- browser ----------
+\node[proc,text width=56mm] (ui) at (25.0,3.4)
+  {Browser --- Online-RL page\\[1mm]
+   \scriptsize React/Redux $\cdot$ ROSLIB.js over rosbridge $\cdot$ HTTP to supervisor\_api\\[1mm]
+   \scriptsize \textbf{HUMAN} badge $=$ \texttt{policyPaused \&\& teleopEngaged}\\
+   \scriptsize live 40-frame correction counter\\
+   \scriptsize per-phase instruction dropdown (T19)};
+\begin{scope}[on background layer]
+\node[container,fill=cUI,fit=(ui),
+      label={[font=\bfseries]north:operator's browser}] (uibox) {};
+\end{scope}
 
-% ===================== Browser =====================
-\node[proc, below=42mm of policy, minimum height=20mm, minimum width=40mm] (ui) {Browser: Online-RL Page\\\tiny React/Redux, ROSLIB.js over rosbridge, HTTP fetch to supervisor\_api\\HUMAN/AUTO badge = policyPaused \&\& teleopEngaged};
-\node[font=\tiny\itshape,align=center,below=1mm of ui,text width=60mm] {Home pose (T18) publishes straight to ai\_worker over rosbridge --\\bypasses the orchestrator entirely, unlike every other UI action};
-\begin{pgfonlayer}{background}
-\node[container, fit=(ui), fill=cUI, label={[font=\bfseries]above:operator's browser}] (uibox) {};
-\end{pgfonlayer}
+% ---------- leader chain ----------
+\draw[ed]    (lhw)   -- node[lbl,right]{raw ADC} (joy);
+\draw[ed]    (joy)   -- node[lbl,right]{T2} (bcast);
+\draw[human] (bcast.east) -- node[lbl,above,pos=0.45]{T3} (teleop.west);
+\draw[ed]    (joy.west)   -- ++(-1.4,0) |- node[lbl,pos=0.22,left]{T15} (bridge.west);
+\draw[ed]    (teleop.south west) -- node[lbl,above,pos=0.4]{T4} (bridge.north east);
 
-% ===================== Disk =====================
-\node[diskbox, below=16mm of cyclodata, xshift=-2mm] (mcap) {/workspace/rosbag2/\\$<$task$>$/$<$episode$>$/*.mcap\\+ episode\_info.json};
-\node[diskbox, right=10mm of mcap] (lerobot) {/workspace/lerobot/\\$<$dataset$>$\\LeRobot v3.0 \emph{and} v2.1\\\tiny (Isaac tooling needs v2.1 --\\\tiny v3.0's chunked file layout\\\tiny is incompatible with it)};
+% ---------- the shared action topic ----------
+\draw[human] (teleop.east) -- node[lbl,above,pos=0.5]{\textbf{T6} human} (fctrl.west);
+\draw[auto]  (policy.west) -- node[lbl,above,pos=0.5]{\textbf{T6} policy} (fctrl.east);
 
-% ===================== EDGES: leader chain =====================
-% Only plain --  /  -|  /  |-  paths and midway-labelled nodes below --
-% to[bend] curve-construction combined with sloped multi-part labels proved
-% fragile (an earlier revision silently corrupted the whole picture via a
-% pgfkeys/curve-construction error cascade). Straight/right-angle paths only.
-\draw[topic] (leaderhw) -- node[midway,right]{raw ADC} (a2joy);
-\draw[topic] (leaderhw) -- (a2bcast);
-\draw[topic] (a2joy) -- node[midway,above]{T2} (a2bcast);
-\draw[topic] (a2bcast) -- node[midway,above]{T3} (teleop);
-\draw[svc] (a2bcast) -- node[midway,below]{T17} (teleop);
-\draw[topic] (teleop) -- node[midway,right]{T4} (bridge);
-\draw[topic] (a2joy.west) -| node[midway,above,sloped]{T15} ($(a2joy.west)+(-14mm,0)$) |- (bridge.west);
+\node[note,text width=76mm,anchor=north west] at (11.8,-0.9)
+ {\textbf{T6 is ONE topic, written by BOTH sides.}
+  \texttt{/leader/joint\_trajectory\_command\_broadcaster\_\{left,right\}/joint\_trajectory}.
+  Teleop node and policy publish to the same place, so the recorded \texttt{action} is
+  correct in \emph{either} mode --- there is no stale-leader pose. \textbf{T14}
+  (\texttt{/task/policy\_active}, latched) is what stops them contending.};
 
-\draw[topic, thick] (teleop) -- node[midway,above]{T6 human} (followerctrl);
-\draw[topic, thick, dashed] (policy) -- node[midway,below]{T6 auto} (followerctrl);
-\node[font=\tiny,align=center,below=1mm of followerctrl] {\it T6 protected by T14 -- cyclo silent while INFERENCING \& idle};
+% ---------- follower feedback ----------
+\draw[ed] (fhw)   -- (fctrl);
+\draw[ed] (fctrl) -- (cams);
+\draw[ed] (cams.east) -- ++(2.2,0) |- node[lbl,pos=0.25,right]{T7} (policy.south east);
 
-\draw[topic] (followerctrl) -| node[midway,right]{T7} (policy);
-\draw[topic] (followerctrl.south) -- (cams.north);
-\draw[topic] (cams) -- node[midway,below]{T7} (policy);
+% ---------- control plane ----------
+\draw[ed] (orch.west)   -- ++(-2.2,0) |- node[lbl,pos=0.22,left]{T14 \emph{latched}} (bcast.west);
+\draw[ed] (bridge.south) -- node[lbl,left,pos=0.6]{T5 \emph{latched}} (orch.north);
+\draw[ed] (bridge.south east) -- ++(2.6,-2.6) -| node[lbl,pos=0.15,above]{T16} (rb.north);
+\draw[ed] (orch) -- node[lbl,above]{T9} (rb);
+\draw[ed] (rb.east) -- node[lbl,above,pos=0.4]{T10 \emph{latched}} (ui.west);
+\draw[ed] (orch.south) -- node[lbl,left]{T11} (cdata.north);
+\draw[ed] (supapi.east) -- ++(2.0,0) |- node[lbl,pos=0.25,below]{HTTP} (ui.south west);
+\draw[ed] (rb.north east) -- ++(2.0,3.2) -| node[lbl,pos=0.2,left]{T8} (policy.south west);
 
-% ---- Lanes crossing from ai_worker down into cyclo_intelligence ----
-% Four distinct vertical lanes at increasing x, left to right: T1, T14,
-% T16, T5+T7. Each drops straight down from its source, in the open gap
-% to the left of orch/rosbridge, then turns into its destination -- no
-% two of these share a corridor.
-\draw[topic] ($(a2joy.west)+(0,-4mm)$) -| ++(-38mm,0) node[pos=0.05,above,sloped]{T1} |- (orch.west);
-\draw[svc]   (orch.north) -- node[pos=0.5,left,align=center]{T14\\(latched)} (teleop -| orch.north |- teleop.south);
-\draw[svc]   (bridge.south) -- ++(0,-10mm) -| node[pos=0.55,above]{T16} (rosbridge.north);
-\draw[topic] (bridge.west) -| ++(-8mm,0) node[pos=0.4,above,sloped]{T5} |- (cyclobox.north west);
-\draw[topic] (cams.west) -| ++(-52mm,0) node[pos=0.06,above,sloped]{T7} |- (cyclodata.north west);
+\node[note,text width=56mm,anchor=north west] at (21.6,-0.9)
+ {\textbf{T18 Home} publishes straight from the browser into \texttt{ai\_worker}
+  over rosbridge, bypassing the orchestrator --- the only UI action that does.};
 
-% ===================== EDGES: orchestrator hub =====================
-\draw[svc] (ui.north) -- ++(0,6mm) -| node[pos=0.85,above]{T9} (orch.east);
-\draw[topic] (orch.south) -- ++(0,-7mm) -| node[pos=0.7,above]{T10 (latched)} (ui.west);
-\draw[svc] (orch.north) -- ++(0,4mm) -| node[pos=0.85,above]{internal RPC} ($(teleop.east)!0.5!(followerhw.west)$) |- (policy.west);
-\draw[svc] (orch) -- node[midway,left]{T11} (cyclodata);
-\draw[svc] (ui.south) |- ($(cyclodata.south)+(0,-6mm)$) -- node[midway,below]{T13} (cyclodata.south);
-\draw[svc] (ui) -- node[midway,above]{HTTP outcome} (supapi);
-\draw[svc] (ui) -- node[midway,below]{HTTP TRT} (supapi);
-\draw[topic] (rosbridge.east) -- ++(6mm,0) |- (ui.north);
-\draw[topic] (orch) -- (rosbridge);
+\node[proc,text width=84mm,align=left,anchor=north west] at (0.2,-0.9)
+ {\textbf{The operator's takeover loop}\\[0.5mm]
+  \scriptsize 1. joystick drag-down $\geq$1\,s \ $\to$ T16 \ $\to$ INFERENCING $\to$ \textbf{PAUSED}\\
+  \scriptsize 2. tact press \ $\to$ T2 \texttt{COMMAND\_TOGGLE} \ $\to$ that arm \textbf{engages}\\
+  \scriptsize 3. tact press again \ $\to$ arm \textbf{disengages}, gripper holds its teleoped value\\
+  \scriptsize 4. joystick drag-down $\geq$1\,s \ $\to$ T16 \ $\to$ PAUSED $\to$ \textbf{INFERENCING}\\[0.8mm]
+  \scriptsize The gaps 1$\to$2 and 3$\to$4 are PAUSED with no arm engaged: labelled $-1$, not human.\\
+  \scriptsize T16 is one topic with two meanings, resolved by the phase it arrives in.};
 
-\draw[topic] (cyclodata) -- (mcap);
-\draw[topic] (cyclodata) -- node[midway,above]{convert, fps=30} (lerobot);
+\end{tikzpicture}}
 
-\end{tikzpicture}%
-}
+\newpage
 
-\clearpage
-\pagestyle{empty}
-
+% =====================================================================
+% PAGE 2 -- DATA
+% =====================================================================
 \begin{center}
-{\LARGE\bfseries Core Pipelines --- Step by Step}\\[2pt]
-{\small Each box is one node/process; each arrow is one topic or service call, read top to bottom. IDs are defined on p.3+}
+{\LARGE\bfseries Recording and Conversion --- what survives to training}\\[1mm]
+{\small Every recorded topic, and where the online-RL labels are lost}
 \end{center}
-\vspace{4mm}
+\vspace{1mm}
 
-\noindent\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[
-  node distance=8mm and 8mm,
-  proc/.style={draw, rounded corners, fill=white, minimum width=40mm, minimum height=9mm, align=center, font=\scriptsize},
-  hw/.style={draw, rounded corners, fill=white, minimum width=38mm, minimum height=8mm, align=center, font=\scriptsize, dashed},
-  diskbox/.style={draw, fill=cDisk, rounded corners, minimum width=40mm, minimum height=8mm, align=center, font=\scriptsize},
-  pipebox/.style={draw, rounded corners, inner sep=5mm, font=\bfseries\small},
-  topic/.style={-{Latex[length=2mm]}, font=\tiny, align=center},
-  svc/.style={-{Latex[length=2mm]}, dashed, font=\tiny, align=center},
-]
-% Six independent columns, one pipeline each, all anchored at explicit
-% absolute x so an uneven chain length (Pipeline 3 has a branch, the
-% others don't) can never push a later column out of alignment the way
-% chained below/right-of positioning did in the first attempt at this page.
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm]
 
-% ===================== Pipeline 1: Teleoperation =====================
-\node[hw] at (0,0) (p1n1) {A2 Leader HW};
-\node[proc, below=of p1n1] (p1n2) {a2\_joystick\_controller};
-\node[proc, below=of p1n2] (p1n3) {a2\_joint\_trajectory\_\\command\_broadcaster};
-\node[proc, below=of p1n3] (p1n4) {cyclo\_teleoperation\_node\\\tiny mode1 MoveJ / mode2 delta};
-\node[proc, below=of p1n4, fill=cAiWorker] (p1n5) {Follower ros2\_control};
-\draw[topic] (p1n1) -- node[midway,right]{raw ADC} (p1n2);
-\draw[topic] (p1n2) -- node[midway,right]{T2} (p1n3);
-\draw[topic] (p1n3) -- node[midway,right]{T3} (p1n4);
-\draw[topic,thick] (p1n4) -- node[midway,right]{T6 human} (p1n5);
-\node[pipebox, fit=(p1n1)(p1n2)(p1n3)(p1n4)(p1n5), label=above:{1. Teleoperation}] (p1box) {};
+\node[proc,text width=80mm,align=left] (obs) at (4.6,12.6)
+ {\textbf{observation.images} --- 4 cameras\\
+  \scriptsize\texttt{cam\_left\_head} \ \texttt{/zed/zed\_node/left/image\_rect\_color/compressed}\\
+  \scriptsize\texttt{cam\_left\_wrist} \ \texttt{/camera\_left/.../image\_rect\_raw/compressed} \ rot 270\\
+  \scriptsize\texttt{cam\_right\_wrist} \ \texttt{/camera\_right/.../image\_rect\_raw/compressed} \ rot 270\\
+  \scriptsize\texttt{cam\_right\_head} \ \texttt{/zed/zed\_node/right/image\_rect\_color/compressed}};
 
-% ===================== Pipeline 2: Autonomous policy control =====================
-\node[proc] at (68mm,0) (p2n1) {Follower \texttt{/joint\_states}\\+ 3 cameras};
-\node[proc, below=of p2n1, fill=cPolicy] (p2n2) {groot\_server\\control\_loop + engine};
-\node[proc, below=of p2n2, fill=cAiWorker] (p2n3) {Follower ros2\_control};
-\draw[topic] (p2n1) -- node[midway,right]{T7} (p2n2);
-\draw[topic,thick,dashed] (p2n2) -- node[midway,right]{T6 auto} (p2n3);
-\node[font=\tiny,align=center,below=3mm of p2n3,text width=40mm] {\it Exclusive with Pipeline 1 while\\INFERENCING -- gated by T14};
-\node[pipebox, fit=(p2n1)(p2n2)(p2n3), label=above:{2. Autonomous}] (p2box) {};
+\node[proc,text width=80mm,align=left] (st) at (4.6,9.6)
+ {\textbf{observation.state} --- 22 dims\\
+  \scriptsize\texttt{upper\_body} \ \texttt{/joint\_states} \ JointState --- 19 joints:\\
+  \scriptsize\hspace{4mm}\texttt{arm\_l\_joint1..7}, \texttt{gripper\_l\_joint1},\\
+  \scriptsize\hspace{4mm}\texttt{arm\_r\_joint1..7}, \texttt{gripper\_r\_joint1},\\
+  \scriptsize\hspace{4mm}\texttt{head\_joint1..2}, \texttt{lift\_joint}\\
+  \scriptsize\texttt{mobile} \ \texttt{/odom} \ Odometry --- \texttt{linear\_x}, \texttt{linear\_y}, \texttt{angular\_z}};
 
-% ===================== Pipeline 3: Pause / Resume gesture =====================
-\node[hw] at (136mm,0) (p3n1) {A2 Leader HW\\(right stick held)};
-\node[proc, below=of p3n1] (p3n2) {a2\_joystick\_controller};
-\node[proc, below=of p3n2, fill=yellow!25] (p3n3) {leader\_bridge.py\\\tiny drag $\geq$1.0s, $|$val$|>0.6$};
-\node[proc, below=of p3n3] (p3n4) {rosbridge\_websocket};
-\node[proc, below=of p3n4, fill=cCyclo] (p3n5) {orchestrator\_node\\\tiny toggles PAUSED$\leftrightarrow$INFER.};
-\node[proc, below=14mm of p3n5, xshift=-19mm, fill=cAiWorker, minimum width=36mm, font=\tiny] (p3n6) {cyclo\_teleoperation\_node};
-\node[proc, below=14mm of p3n5, xshift=19mm, fill=cUI, minimum width=36mm] (p3n7) {Browser badge};
-\draw[topic] (p3n1) -- node[midway,right]{raw ADC} (p3n2);
-\draw[topic] (p3n2) -- node[midway,right]{T15} (p3n3);
-\draw[svc] (p3n3) -- node[midway,right]{T16} (p3n4);
-\draw[svc] (p3n4) -- node[midway,right]{service call} (p3n5);
-\draw[svc] (p3n5.south) -| node[pos=0.6,above,sloped]{T14} (p3n6.north);
-\draw[topic] (p3n5.south) -| node[pos=0.6,above,sloped]{T10} (p3n7.north);
-\node[pipebox, fit=(p3n1)(p3n2)(p3n3)(p3n4)(p3n5)(p3n6)(p3n7), label=above:{3. Pause/resume gesture}] (p3box) {};
+\node[proc,text width=80mm,align=left] (ac) at (4.6,6.3)
+ {\textbf{action} --- 20 dims. Each topic is BOTH the policy's command\\target and the record target.\\
+  \scriptsize\texttt{arm\_left} \ \texttt{/leader/joint\_trajectory\_command\_broadcaster\_left/...}\\
+  \scriptsize\texttt{arm\_right} \ \texttt{/leader/joint\_trajectory\_command\_broadcaster\_right/...}\\
+  \scriptsize\texttt{head} \ \texttt{/leader/joystick\_controller\_left/joint\_trajectory}\\
+  \scriptsize\texttt{lift} \ \texttt{/leader/joystick\_controller\_right/joint\_trajectory}\\
+  \scriptsize\texttt{mobile} \ \texttt{/cmd\_vel} \ Twist};
 
-% ===================== Pipeline 4: Recording -> dataset =====================
-\node[proc] at (204mm,0) (p4n1) {Follower \texttt{/joint\_states}\\+ 3 cameras};
-\node[proc, below=of p4n1, fill=cCyclo] (p4n2) {cyclo\_data\_node\\\tiny rosbag\_recorder};
-\node[diskbox, below=of p4n2] (p4n3) {*.mcap +\\episode\_info.json};
-\node[proc, below=of p4n3, fill=cCyclo] (p4n4) {cyclo\_data\_node\\\tiny converter};
-\node[diskbox, below=of p4n4] (p4n5) {LeRobot v3.0 dataset};
-\draw[topic] (p4n1) -- node[midway,right]{T7} (p4n2);
-\draw[topic] (p4n2) -- node[midway,right]{write} (p4n3);
-\draw[svc] (p4n3) -- node[midway,right]{T13} (p4n4);
-\draw[topic] (p4n4) -- node[midway,right]{write} (p4n5);
-\node[pipebox, fit=(p4n1)(p4n2)(p4n3)(p4n4)(p4n5), label=above:{4. Recording $\to$ dataset}] (p4box) {};
+\node[proc,text width=80mm,align=left] (ex) at (4.6,2.8)
+ {\textbf{recording.extra\_topics} --- in the bag, not training data\\
+  \scriptsize\textcolor{eHuman}{\textbf{/task/inference\_status}} \ \ \textcolor{eHuman}{$\leftarrow$ the intervention source}\\
+  \scriptsize\texttt{/tf}\\
+  \scriptsize\texttt{/zed/zed\_node/\{left,right\}/camera\_info}\\
+  \scriptsize\texttt{/camera\_\{left,right\}/.../camera\_info}\\[1mm]
+  \scriptsize\itshape \texttt{/leader/teleoperation/control\_status} deliberately absent ---\\
+  \scriptsize\itshape robotis\_interfaces is not installed where the recorder runs.};
 
-% ===================== Pipeline 5: Home Pose =====================
-\node[proc, fill=cUI] at (272mm,0) (p5n1) {Browser: Home button};
-\node[proc, below=of p5n1, fill=cAiWorker] (p5n2) {cyclo\_teleoperation\_node\\+ a2\_joystick\_controller\\\tiny suppress idle publish};
-\node[proc, below=of p5n2, fill=cAiWorker] (p5n3) {Follower ros2\_control\\\tiny one-shot 10s trajectory};
-\node[proc, below=of p5n3, fill=cAiWorker] (p5n4) {cyclo\_teleoperation\_node\\\tiny re-capture hold\_target\_\\\tiny + gripper from real pose};
-\draw[svc] (p5n1) -- node[midway,right]{T18=true} (p5n2);
-\draw[topic,thick] (p5n2) -- node[midway,right]{T6 + head/lift} (p5n3);
-\draw[svc] (p5n3) -- node[midway,right]{T18=false, +13s} (p5n4);
-\node[pipebox, fit=(p5n1)(p5n2)(p5n3)(p5n4), label=above:{5. Home Pose}] (p5box) {};
+\begin{scope}[on background layer]
+\node[container,fill=cAiWorker,fit=(obs)(st)(ac)(ex),
+      label={[font=\bfseries,anchor=north west]north west:recorded topics --- \texttt{ffw\_sg2\_rev1\_config.yaml}}] {};
+\end{scope}
 
-% ===================== Pipeline 6: UI task lifecycle =====================
-\node[proc, fill=cUI] at (340mm,0) (p6n1) {Browser: Start / Pause / Resume};
-\node[proc, below=of p6n1, fill=cCyclo] (p6n2) {orchestrator\_node};
-\node[proc, below=of p6n2, fill=cPolicy] (p6n3) {groot\_server\\\tiny LOAD/START/PAUSE/RESUME};
-\draw[svc] (p6n1) -- node[midway,right]{T9} (p6n2);
-\draw[svc] (p6n2) -- node[midway,right]{internal RPC} (p6n3);
-\draw[topic] (p6n2.west) .. controls +(-14mm,0mm) and +(-14mm,0mm) .. node[pos=0.5,left]{T10} (p6n1.west);
-\node[pipebox, fit=(p6n1)(p6n2)(p6n3), label=above:{6. UI task lifecycle}] (p6box) {};
+\node[disk,text width=46mm] (mcap) at (16.4,10.6)
+ {\texttt{/workspace/rosbag2/}\\\texttt{<task>/<episode>/*.mcap}\\+ \texttt{episode\_info.json}};
 
-\end{tikzpicture}%
-}
+\node[proc,text width=52mm] (conv) at (16.4,6.6)
+ {\texttt{base\_converter.py}\\[1mm]
+  \scriptsize resample to 30 fps, causal previous-value\\
+  \scriptsize \texttt{\_assign\_subtask\_indices} --- uses the T19 log\\[1mm]
+  \scriptsize\textbf{\texttt{\_assign\_intervention\_flags}}\\
+  \scriptsize INFERENCING $\to$ \textbf{0} \ \ PAUSED + engaged $\to$ \textbf{1}\\
+  \scriptsize handoff / slow-start / nobody driving $\to$ \textbf{$-1$}};
 
-\clearpage
-\newgeometry{margin=2cm}
-\pagestyle{empty}
+\draw[ed] (obs.east) -- ++(1.6,0) |- (mcap.west);
+\draw[ed] (ex.east)  -- ++(1.6,0) |- (mcap.west);
+\draw[ed] (mcap) -- node[lbl,right]{fps $=$ 30} (conv);
 
-{\LARGE\bfseries Topic / Service Legend}
+\node[disk,text width=56mm] (v30) at (26.0,9.2)
+ {\texttt{LeRobot v3.0}\\[1mm]
+  \scriptsize index $\cdot$ episode\_index $\cdot$ task\_index $\cdot$ timestamp\\
+  \scriptsize observation.state $\cdot$ action $\cdot$ subtask\_index\\[1mm]
+  \scriptsize\textbf{intervention} \ \textbf{reward} \ \textbf{done} \ \textbf{sample\_weight}};
 
-\vspace{4mm}
-\begin{longtable}{p{7mm}p{15mm}p{68mm}p{50mm}p{92mm}}
-\textbf{ID} & \textbf{Kind} & \textbf{Name} & \textbf{Type} & \textbf{Note} \\
+\node[bad,text width=56mm] (v21) at (26.0,4.4)
+ {\texttt{LeRobot v2.1} --- \textbf{what Isaac-GR00T requires}\\[1mm]
+  \scriptsize index $\cdot$ episode\_index $\cdot$ task\_index $\cdot$ timestamp\\
+  \scriptsize observation.state $\cdot$ action $\cdot$ subtask\_index\\[1mm]
+  \scriptsize\textcolor{eHuman}{\textbf{no intervention $\cdot$ no reward}}\\
+  \scriptsize\textcolor{eHuman}{\textbf{no done $\cdot$ no sample\_weight}}};
+
+\draw[ed] (conv.east) -- ++(1.6,0) |- node[lbl,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
+\draw[ed] (conv.east) -- ++(1.6,0) |- node[lbl,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
+
+\node[note,text width=84mm,anchor=north west,text=eHuman] at (20.4,1.9)
+ {\textbf{This is where HG-DAgger dies.} \texttt{\_assign\_intervention\_flags}
+  computes a correct per-frame label, and \texttt{to\_lerobot\_v30.py} writes it out
+  (lines 1484--1489). \texttt{to\_lerobot\_v21.py} never does --- \texttt{grep -c
+  intervention} on it returns \textbf{0}. Isaac requires v2.1, so every GR00T export
+  silently loses the human/policy label and degrades to plain behaviour cloning.
+  Fix: \texttt{IMPROVEMENTS.md} \S3.};
+
+\end{tikzpicture}}
+
+\newpage
+
+% =====================================================================
+% PAGE 3+ -- LEGEND
+% =====================================================================
+{\LARGE\bfseries Topic / Service Legend}\\[1mm]
+{\small Verified against \texttt{cyclo\_intelligence\_backup@main} and \texttt{aiw\_backup@feature-a2}, 2026-08-30.}\\[3mm]
+
+\begin{longtable}{p{7mm}p{19mm}p{60mm}p{42mm}p{100mm}}
 \hline
-\endfirsthead
-\multicolumn{5}{l}{\small\it Topic / Service Legend (continued)} \\
-\textbf{ID} & \textbf{Kind} & \textbf{Name} & \textbf{Type} & \textbf{Note} \\
+\textbf{ID} & \textbf{Kind} & \textbf{Name} & \textbf{Type} & \textbf{Meaning / gotcha}\\
 \hline
 \endhead
-T1 & \scriptsize PUB/SUB & \texttt{\scriptsize .../tact\_trigger} & \texttt{\scriptsize std\_msgs/String} & \scriptsize "left"/"right" tap. Ignored for recording (\texttt{record\_triggers\_enabled=false}). \\
-T2 & \scriptsize PUB/SUB & \texttt{\scriptsize .../joystick\_command} & \texttt{\scriptsize robotis\_interfaces\allowbreak/TeleoperationCommand} & \scriptsize ENABLE/DISABLE/TOGGLE per arm. \texttt{a2\_joystick\_controller} $\to$ broadcaster. \\
-T3 & \scriptsize PUB/SUB & \scriptsize \texttt{.../raw\_joint\_trajectory} (internal) & \texttt{\scriptsize trajectory\_msgs\allowbreak/JointTrajectory} & \scriptsize Broadcaster's leader reference $\to$ \texttt{cyclo\_teleoperation\_node}. \\
-T17 & \scriptsize PUB/SUB & \texttt{\scriptsize .../control\_command} & \texttt{\scriptsize robotis\_interfaces\allowbreak/ControlModeCommand} & \scriptsize Selects mode (1=absolute, 2=delta, default) + enabled arms. \\
-T4 & \scriptsize PUB/SUB & \texttt{\scriptsize .../control\_status} & \texttt{\scriptsize robotis\_interfaces\allowbreak/ControlModeStatus} & \scriptsize \texttt{active\_arms}/mode/sync. Not decodable in \texttt{cyclo\_intelligence} -- excluded from recording. \\
-T5 & \scriptsize PUB/SUB latched & \texttt{\scriptsize .../active\_arms\_str} & \texttt{\scriptsize std\_msgs/String} & \scriptsize Decodable translation of T4. UI badge subscribes here. \\
-T15 & \scriptsize PUB/SUB & \texttt{\scriptsize .../sensorxel\_joy\_values} & \texttt{\scriptsize std\_msgs\allowbreak/Float64MultiArray} & \scriptsize Raw joystick axes. \texttt{leader\_bridge.py} watches R-stick Y for the pause gesture. \\
-T16 & \scriptsize PUB/SUB & \texttt{\scriptsize .../toggle\_pause\_request} & \texttt{\scriptsize std\_msgs/Empty} & \scriptsize Fires once on a $\geq$1.0s drag-hold. Orchestrator decides Pause vs Resume. \\
-T6 & \scriptsize PUB/SUB & \texttt{\scriptsize .../joint\_trajectory\_command\_\allowbreak broadcaster\_\{l,r\}/...} & \texttt{\scriptsize trajectory\_msgs\allowbreak/JointTrajectory} & \scriptsize Arm commands. 3 possible publishers (teleop/policy/Home); guarded by T14. \\
-T18 & \scriptsize PUB/SUB latched & \texttt{\scriptsize .../home\_in\_progress} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize Bypasses orchestrator. One-shot Home trajectory on T6; falling edge re-captures gripper. \\
-T14 & \scriptsize PUB/SUB latched & \texttt{\scriptsize /task/policy\_active} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize Mirrors T10's INFERENCING for ai\_worker. Gates T6's idle publish. \\
- & \scriptsize PUB/SUB & \texttt{\scriptsize .../joystick\_controller\_\{l,r\}/joint\_trajectory} & \texttt{\scriptsize trajectory\_msgs\allowbreak/JointTrajectory} & \scriptsize Head/lift jog. Frozen during policy control. \textbf{Left (head) side is republished at 100Hz regardless of jog\_scale} -- with the follower's head\_controller remapped onto this same topic name, that stream permanently overrode any other head command (incl. the auto-home-on-startup). Left's publish target is now redirected to a dead-end topic (never reaches the real head\_controller); right (lift) is unaffected and still works. \\
- & \scriptsize PUB/SUB & \texttt{\scriptsize /cmd\_vel} & \texttt{\scriptsize geometry\_msgs/Twist} & \scriptsize Mobile base. Frozen during policy control. \\
-T7 & \scriptsize PUB/SUB & \scriptsize \texttt{/joint\_states} + camera topics & \texttt{\scriptsize sensor\_msgs/JointState,\allowbreak CompressedImage} & \scriptsize Follower feedback + 4 cameras (recorder); policy input uses 3. Feeds broadcaster/policy/recorder/preview. \texttt{video\_recorder.py}'s subscription to these topics was found commented out with a stray dead-code \texttt{return} in its callback (local, uncommitted edits, not a design issue) -- every camera recorded zero frames for every episode until fixed; the raw topics themselves were streaming fine the whole time, making this easy to misdiagnose as a camera/hardware problem. \\
-T9 & \scriptsize SERVICE & \texttt{\scriptsize /task/command} & \texttt{\scriptsize SendCommand.srv} & \scriptsize Start/Pause/Resume/Clear policy; Start/Stop/Cancel recording. \\
-T10 & \scriptsize PUB/SUB latched & \texttt{\scriptsize /task/inference\_status} & \texttt{\scriptsize interfaces/\allowbreak InferenceStatus} & \scriptsize READY/LOADING/INFERENCING/PAUSED phase. \\
-T11 & \scriptsize SERVICE & \texttt{\scriptsize /data/recording} & \texttt{\scriptsize RecordingCommand.srv} & \scriptsize Recording lifecycle: orchestrator $\to$ \texttt{cyclo\_data}. \\
-T13 & \scriptsize SERVICE & \texttt{\scriptsize /data/convert(/status)} & \texttt{\scriptsize srv} & \scriptsize LeRobot conversion (v3.0 and/or v2.1). Triggered separately from Save. \texttt{fps} defaults to 30 (was silently 15 -- fixed). \\
-T19 & \scriptsize SERVICE & \texttt{\scriptsize /task/command (UPDATE\_INSTRUCTION)} & \texttt{\scriptsize SendCommand.srv} & \scriptsize Fired by the UI's "Update Task Instruction" button (not the preset dropdown alone). Re-conditions the running policy \emph{and} appends a \texttt{(elapsed\_s, instruction)} entry to the active recording's \texttt{instruction\_change\_log} via T11/SET\_TASK\_INFO -- this is what lets one continuous multi-phase take end up with correctly time-split \texttt{segments} in \texttt{episode\_info.json} instead of one instruction covering the whole episode. \\
- & \scriptsize HTTP & \texttt{\scriptsize /api/recording/outcome} & \scriptsize REST (supervisor\_api) & \scriptsize Writes \texttt{outcome}+\texttt{success\_frame} to \texttt{episode\_info.json}. \\
- & \scriptsize HTTP & \texttt{\scriptsize /api/backends/groot/trt/*} & \scriptsize REST (supervisor\_api) & \scriptsize TensorRT engine status/build. \\
+T1 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/joystick\_controller/tact\_trigger} & \texttt{\scriptsize std\_msgs/String} & \scriptsize "left"/"right" tap. \textbf{Record trigger disabled} (\texttt{record\_triggers\_enabled: false}): one press both engages that leader arm and fires a record trigger, and engaging an arm during INFERENCING puts the leader onto T6 against the policy.\\
+T2 & \scriptsize PUB/SUB & \texttt{\scriptsize .../joystick\_command} & \texttt{\scriptsize robotis\_interfaces/\allowbreak TeleoperationCommand} & \scriptsize ENABLE / DISABLE / TOGGLE, per arm.\\
+T3 & \scriptsize PUB/SUB & \texttt{\scriptsize .../raw\_joint\_trajectory} & \texttt{\scriptsize trajectory\_msgs/\allowbreak JointTrajectory} & \scriptsize The leader's own arm command, before mode handling.\\
+T4 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/teleoperation/control\_status} & \texttt{\scriptsize robotis\_interfaces/\allowbreak ControlModeStatus} & \scriptsize \texttt{active\_arms} + mode. \textbf{Not recorded} --- \texttt{robotis\_interfaces} is absent where \texttt{service\_bag\_recorder} runs, and adding it killed the whole launch group after every takeover. Record T5 instead.\\
+T5 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /leader/teleoperation/active\_arms\_str} & \texttt{\scriptsize std\_msgs/String} & \scriptsize Plain-string translation of T4 from \texttt{leader\_bridge.py}; loadable everywhere. The UI badge reads it. \textbf{The bag should too} --- see IMPROVEMENTS \S3.4.\\
+T6 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/joint\_trajectory\_command\_\allowbreak broadcaster\_\{left,right\}/joint\_trajectory} & \texttt{\scriptsize trajectory\_msgs/\allowbreak JointTrajectory} & \scriptsize \textbf{Written by BOTH the teleop node and the policy.} This is why \texttt{action} is valid in either mode. Contention is prevented by T14, not by using separate topics.\\
+T7 & \scriptsize PUB/SUB & \texttt{\scriptsize /joint\_states}, \texttt{/odom}, 4 camera topics & \texttt{\scriptsize JointState, Odometry,\allowbreak CompressedImage} & \scriptsize Follower feedback and vision. 4 cameras are recorded; the policy's modality config declares 3.\\
+T8 & \scriptsize PUB/SUB & \texttt{\scriptsize /<backend>/engine\_command} & \texttt{\scriptsize std\_msgs/String} & \scriptsize Orchestrator $\to$ \texttt{groot\_server}: load / unload / run.\\
+T9 & \scriptsize SERVICE & \texttt{\scriptsize /task/command} & \texttt{\scriptsize SendCommand.srv} & \scriptsize Start / Pause / Resume / Clear policy; Start / Stop / Cancel recording.\\
+T10 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/inference\_status} & \texttt{\scriptsize interfaces/InferenceStatus} & \scriptsize \texttt{inference\_phase}: READY 0, LOADING 1, INFERENCING 2, PAUSED 3. \textbf{Published on transitions only}, so the converter must forward-fill. Sole source of the intervention label.\\
+T11 & \scriptsize SERVICE & \texttt{\scriptsize /data/recording} & \texttt{\scriptsize RecordingCommand.srv} & \scriptsize Recording lifecycle, orchestrator $\to$ \texttt{cyclo\_data\_node}.\\
+T13 & \scriptsize SERVICE & \texttt{\scriptsize /data/convert}, \texttt{\scriptsize /data/convert/status} & \texttt{\scriptsize StartConversion.srv,\allowbreak GetConversionStatus.srv} & \scriptsize LeRobot conversion. \texttt{convert\_v21} and \texttt{convert\_v30} both false means "run both".\\
+T14 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/policy\_active} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize Mirrors T10's INFERENCING into \texttt{ai\_worker}. Gates the leader chain off T6 so leader and policy never publish together.\\
+T15 & \scriptsize PUB/SUB & \texttt{\scriptsize .../sensorxel\_joy\_values} & \texttt{\scriptsize std\_msgs/\allowbreak Float64MultiArray} & \scriptsize Raw joystick axes; \texttt{leader\_bridge.py} watches them for the drag-hold gesture.\\
+T16 & \scriptsize PUB/SUB & \texttt{\scriptsize .../toggle\_pause\_request} & \texttt{\scriptsize std\_msgs/Empty} & \scriptsize Fires once on a $\geq$1.0\,s drag-hold. Lets the operator pause/resume the policy without the browser.\\
+T17 & \scriptsize PUB/SUB & \texttt{\scriptsize .../control\_command} & \texttt{\scriptsize robotis\_interfaces/\allowbreak ControlModeCommand} & \scriptsize Mode 1 absolute MoveJ, mode 2 relative delta. SG2 runs mode 2.\\
+T18 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/home\_in\_progress} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize One-shot Home trajectory. \textbf{Published straight from the browser}, bypassing the orchestrator --- the only UI action that does.\\
+T19 & \scriptsize SERVICE & \texttt{\scriptsize /task/command} (UPDATE\_INSTRUCTION) & \texttt{\scriptsize SendCommand.srv} & \scriptsize "Update Task Instruction". Appends to \texttt{instruction\_change\_log}, which splits the episode into correctly-timed sub-segments. Without it a continuous take yields one segment and every frame carries whatever instruction was set last.\\
 \hline
 \end{longtable}
-{\scriptsize\it Mode 2 (\texttt{AiWorkerElbowUpLeaderMode}, see T17): anchor-capture on engage, \texttt{goal = follower\_anchor + (leader\_now -- leader\_anchor)} -- zero jump even if leader and follower drifted apart. Mode 1 relays absolute leader positions and does jump.}
 
-\vspace{6mm}
-{\large\bfseries Per-frame dataset columns (converter output)}
 \vspace{2mm}
-
-\begin{itemize}[itemsep=3mm, topsep=1mm, leftmargin=8mm]
-\item \textbf{\texttt{intervention}} (int64) -- Causal fill of T10: \texttt{INFERENCING}$\to$0, \texttt{PAUSED}$\to$1, else $-1$ (also $-1$ during leader retargeting -- that's the clutch, not a human command). Only the $-1$/0 half is reliable today; the 1 case needs T4$\to$T5 rewiring (pending).
-\item \textbf{\texttt{sample\_weight}} (float32) -- Matches Larchenko's LeHome Challenge weighting exactly (arXiv:2606.27163 \S9.10, Fig.\,17): human frames \textbf{2.0}, autonomous baseline \textbf{0.3}, ramping to \textbf{0.0} over the 5s before a takeover. Excluded frames stay at 1.0.
-\item \textbf{\texttt{reward}} (int64) -- 1 from \texttt{success\_frame} onward on \texttt{outcome=SUCCESS} episodes, else 0.
-\item \textbf{\texttt{done}} (bool) -- True on the final frame of the episode only.
-\item \textbf{\texttt{task\_index} / \texttt{subtask\_index}} (int64) -- Mapped per-frame from \texttt{episode\_info.json}'s \texttt{segments} array (each with its own \texttt{frame\_duration} range and \texttt{sub\_task\_instruction}) via existing converter logic (\texttt{\_assign\_subtask\_indices}). For a continuous online-RL take this previously always produced exactly one segment spanning the whole episode -- every frame got whichever instruction was set last, regardless of what was actually happening for most of the take. \texttt{instruction\_change\_log} (see T19) now drives splitting that single segment into one correctly-timed sub-segment per real instruction change. The episode's top-level \texttt{task\_instruction} (the overall task, e.g. "Screw the orange bolt into the hole using the driver.") is a separate, stable field -- it is not derived from the live-changing per-phase instruction, since that field gets overwritten on every T19 click.
+{\large\bfseries Derived dataset columns}\\[2mm]
+\begin{itemize}[leftmargin=6mm,itemsep=1.2mm]
+\item \textbf{\texttt{observation.state}} (22) and \textbf{\texttt{action}} (20) --- they differ: state carries \texttt{head\_joint1/2}, action does not. Slice order follows YAML insertion order. The policy declares only the first 16 (both arms); the remainder are recorded but not trained on.
+\item \textbf{\texttt{task\_index} / \texttt{subtask\_index}} --- per frame, from \texttt{episode\_info.json}'s \texttt{segments}, split by \texttt{instruction\_change\_log} (T19). The episode's top-level \texttt{task\_instruction} is a separate stable field; it is \emph{not} the live per-phase instruction, which is overwritten on every T19 click.
+\item \textbf{\texttt{intervention}} --- \textbf{1 = human drove, 0 = policy drove, $-1$ = excluded} (handoff, leader slow-start, nobody driving, phase never observed). This is the \emph{inverse} of \texttt{task\_is\_policy}, the name some downstream tooling expects; getting the polarity wrong raises nothing and trains on exactly the wrong frames. \textbf{v3.0 only.}
+\item \textbf{\texttt{reward}, \texttt{done}, \texttt{sample\_weight}} --- emitted alongside \texttt{intervention}. \textbf{v3.0 only}, so HIL-SERL-style training is also impossible from a v2.1 export.
 \end{itemize}
 
 \end{document}
