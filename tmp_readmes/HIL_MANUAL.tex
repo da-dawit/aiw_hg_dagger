@@ -804,35 +804,53 @@ the parquet files.
 \subsection{How the label is consumed}
 \label{sec:consumed}
 
-The training process never reads an intervention column. Neither
-\texttt{dagger\_human} nor \texttt{dagger\_auto} contains one, and Isaac-GR00T
-makes no reference to \texttt{intervention}, \texttt{task\_is\_policy} or
-\texttt{sample\_weight} anywhere in its source.
+The labels determine what is trained on. They decide which frames enter the
+training set, which are discarded, and what weight each group receives.
 
-The label is a build-time artefact. It is read once, at export, to determine
-which output dataset each frame belongs to, and is then discarded.
+\begin{center}
+\small
+\begin{tabular}{@{}lrlr@{}}
+\toprule
+\textbf{Label} & \textbf{Frames} & \textbf{Destination} & \textbf{Weight}\\
+\midrule
+Operator (1)    & 6{,}765  & \texttt{dagger\_human} & 0.30\\
+Policy (0)      & 32{,}192 & \texttt{dagger\_auto}  & 0.10\\
+Excluded ($-1$) & 4{,}729  & discarded              & ---\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The transfer is exact for the operator frames: all 6{,}765 appear in
+\texttt{dagger\_human}. The policy count falls slightly, to 31{,}804, through
+the minimum-run rule and the pre-intervention window.
+
+What the label does \emph{not} do is appear in the training files. After the
+partition it would be redundant, since every frame in \texttt{dagger\_human} is
+an operator frame by construction; a column asserting this on every row conveys
+nothing. The distinction is carried instead by the dataset boundary, and the
+weighting by the mixture ratio.
 
 \begin{center}
 \small
 \begin{tabular}{@{}rl@{}}
 \toprule
-\textbf{Stage} & \textbf{Use of the label}\\
+\textbf{Stage} & \textbf{Form the distinction takes}\\
 \midrule
-Conversion & Computed from the inference phase\\
-Export     & Read to partition frames; then dropped\\
-Training   & Not present. The partition carries the distinction\\
+Conversion & A per-frame column, computed from the inference phase\\
+Export     & Read once to partition the frames, then dropped\\
+Training   & The dataset a frame belongs to, and that dataset's ratio\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-This follows from Isaac-GR00T having no per-frame loss weighting: a column would
-be of no use to the trainer even if it were present. The corrections are
-weighted by assigning whole datasets a mixture ratio instead.
+This arrangement is required rather than chosen: Isaac-GR00T provides no
+per-frame loss weighting, so a column could not be acted upon even if it were
+present.
 
-\remark{The consequence is that a missing column obstructs the \emph{partition},
-not the training. The labels are required only long enough to divide the frames,
-which is why a reconstruction adequate for that purpose is sufficient, and why
-the reference session could be trained at all despite the export lacking them.}
+\remark{A missing column therefore obstructs the \emph{partition} rather than
+the training. The labels are needed only long enough to divide the frames, which
+is why a reconstruction accurate enough for that purpose suffices, and why the
+reference session could be trained despite its export lacking them.}
 
 \subsection{Polarity}
 
