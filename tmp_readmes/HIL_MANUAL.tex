@@ -121,7 +121,7 @@
 {\Large\scshape Human-in-the-Loop Robot Learning}\\[3mm]
 \rule{9cm}{0.5pt}\\[4mm]
 {\LARGE\bfseries System Manual}\\[10mm]
-{\large FFW SG2 follower \quad A2 leader \quad GR00T-N1.7 policy}\\[24mm]
+{\large FFW SG2 follower \quad A2 leader}\\[24mm]
 
 \begin{minipage}{12cm}
 \small
@@ -130,12 +130,6 @@ subsystems; the procedure for conducting an HG-DAgger session; the contents of
 the resulting dataset; and the training and verification procedures that follow
 from it.
 
-\textsc{Audience.} Operators of the robot, and engineers modifying the recording
-or conversion pipeline.
-
-\textsc{Basis.} Verified against \texttt{cyclo\_intelligence\_backup@main} and
-\texttt{aiw\_backup@feature-a2}. Quantities are measured unless stated
-otherwise; unverified claims are identified as such.
 \end{minipage}
 
 \vfill
@@ -167,12 +161,12 @@ Browser                      & Operator interface for policy control, interventi
 \end{center}
 
 The policy commands sixteen dimensions, corresponding to the two arms. The head,
-lift and mobile base are never commanded by the policy.
+lift and mobile base are never commanded by the policy ($22-6=16$).
 
 \subsection{Shared command topic}
 
-The teleoperation node and the policy publish to the same arm-command topic.
-There is no separate policy channel. Two consequences follow.
+The teleoperation node and the policy publish to the same arm-command topic (thus the SG2 robot).
+There is no separate policy channel. There are two consequences that follow:
 
 \begin{enumerate}
 \item The recorded \texttt{action} column is valid irrespective of which agent
@@ -189,13 +183,16 @@ The corrected frames constitute the training signal. The purpose of the
 surrounding system is to make this exchange safe and to record which frames
 originated from the operator.
 
-\placeholder{fig/session_overview.png}{Work cell during a session: follower arms
-engaged on the task, leader arms held by the operator, operator interface
-visible.}{5cm}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figs/session overview.png}
+    \caption{Work cell during a session: follower arms engaged on the task, leader arms held by the operator, operator UI.}
+    \label{fig:placeholder}
+\end{figure}
 
 % =====================================================================
 \newpage
-\section{Obtaining the software}
+\section{Software Requirements}
 \label{sec:obtain}
 
 \subsection{Repositories}
@@ -206,14 +203,14 @@ visible.}{5cm}
 \toprule
 \textbf{Repository} & \textbf{Branch} & \textbf{Contents}\\
 \midrule
-\texttt{da-dawit/aiw\_backup}                & \texttt{feature-a2} & Robot-side packages; this manual\\
+\texttt{da-dawit/aiw\_backup}                & \texttt{feature-a2} & Robot-side packages; for a2 leader\\
 \texttt{da-dawit/cyclo\_intelligence\_backup} & \texttt{main}       & Orchestration, recording, conversion\\
 \texttt{da-dawit/hg-dagger}                  & \texttt{main}       & Training, evaluation and dataset tooling\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The first two are private; access is by SSH key.
+The first two are private; SSH Keys.
 
 \begin{lstlisting}[style=sh]
 git clone git@github.com:da-dawit/aiw_backup.git
@@ -734,6 +731,126 @@ the odometry dimensions amplified sensor noise. Twenty-seven per cent of the
 proprioceptive input was therefore invalid for the duration of a 30{,}000-step
 run. Dataset validation must reject any declared dimension whose interquantile
 range or standard deviation is zero.}
+
+
+\subsection{Image preparation}
+\label{sec:crop}
+
+The vision-language backbone stacks the camera views into a single tensor, so
+every view presented to it must be square. The four recorded streams are not:
+the head camera is 672$\times$376 and the wrist cameras are 240$\times$424. Two
+methods reconcile this, and the choice between them is not neutral.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{9.6cm}@{}}
+\toprule
+\textbf{Method} & \textbf{Effect}\\
+\midrule
+Letterbox & Pad the shorter axis to square. Field of view is preserved; the padding occupies part of the token budget.\\
+Square crop & Crop the longer axis to square. No padding; the cropped region is discarded.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Why neither method is applied uniformly}
+
+Letterboxing every view, which is the default behaviour, placed 44 per cent of
+each model input in black bars. Cropping every view to square removes that
+waste, but the two camera types were measured separately before the decision was
+taken, and they do not behave alike.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{9.4cm}@{}}
+\toprule
+\textbf{Camera} & \textbf{Measurement}\\
+\midrule
+Head  & Static context view. \textbf{50 per cent of its motion energy}, and 59 per cent during the driver grasp, lies in the lateral bands a centred square crop would remove. The smallest square retaining 90 per cent of that motion still costs 36 per cent padding.\\
+Wrist & Moving close-up. The upper half is ceiling, occupying \textbf{88 per cent of the frame at the grasp instant}. These are also the cameras with the finest resolution on the workspace, at 0.73 to 1.08\,mm per pixel.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The head camera therefore has nothing worth removing, and the wrist cameras have
+nothing worth keeping above the midline.
+
+\subsection{The applied configuration}
+
+Each view must be square, but the squares need not be of equal size: a trailing
+resize normalises all of them to 256$\times$256 before they are stacked.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Camera} & \textbf{Source} & \textbf{Prepared} & \textbf{Padding}\\
+\midrule
+\texttt{cam\_left\_head}   & 672$\times$376, full frame     & 672$\times$672 & 44.0\,\%\\
+\texttt{cam\_left\_wrist}  & 240$\times$240, rows 184--424  & 240$\times$240 & 0\,\%\\
+\texttt{cam\_right\_wrist} & 240$\times$240, rows 184--424  & 240$\times$240 & 0\,\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The head is letterboxed and retains its full field of view; the wrist crops are
+anchored to the lower edge, which removes the ceiling. Across all views:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \textbf{Uniform letterbox} & \textbf{Applied configuration}\\
+\midrule
+Mean black share   & 44.0\,\% & 14.7\,\%\\
+Workspace content  & 18.6\,\% & 40.3\,\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The increase in workspace content comes entirely from the wrist cameras; the
+head view is unchanged.
+
+\subsection{Effect on held-out accuracy}
+
+Measured under an identical protocol, on the same held-out episodes, by forward
+kinematics over the final sixty frames of each phase.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \textbf{Uniform letterbox} & \textbf{Applied configuration}\\
+\midrule
+Grasp the bolt, left arm    & 16.3\,mm & 14.4\,mm\\
+Grasp the driver, right arm & 22.7\,mm & 13.3\,mm\\
+Systematic fraction, right  & 0.87     & 0.40\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The systematic fraction is the ratio of the mean bias to the mean error. A value
+near unity indicates a fixed offset, which no amount of averaging removes; 0.40
+indicates that most of the residual is noise. This configuration was in effect
+for the checkpoint that first grasped reliably on hardware.
+
+\caution{The configuration is specified in \texttt{configs/roi\_hybrid.json} and
+applied by \texttt{crop\_to\_square.patch}, which is not present in a fresh
+clone of Isaac-GR00T. Without the patch every camera is letterboxed and the
+inputs no longer match those the checkpoint was trained on. The training
+launcher verifies the patch before starting.}
+
+\remark{Attention distribution is a poor basis for this decision and was not
+used as one. Measured normalised entropy over the image tokens is 0.9899, where
+1.0 is uniform, and the top eight of 192 tokens hold 8.1 per cent where a
+uniform distribution would give 4.2. At that entropy the observation that
+roughly half the head camera's attention falls on padding is close to the
+proportion of tokens that are padding, and therefore carries little information.
+The decision rests on the motion-energy and occupancy measurements above.}
+
+\placeholder{fig/crop_comparison.png}{The three candidate preparations of the
+head camera --- uniform letterbox, uniform square crop, and the applied
+configuration --- with the workspace region indicated in each.}{6.5cm}
 
 % =====================================================================
 \newpage
@@ -1336,6 +1453,7 @@ Held-out validation set               & 4 episodes, 6{,}962 frames\\
 \texttt{fig/ui\_online\_rl.png}         & Operator interface during an intervention\\
 \texttt{fig/intervention\_recovery.png} & Joint speed, detected spans, disagreement\\
 \texttt{fig/checkpoint\_sweep.png}      & Held-out error against training step\\
+\texttt{fig/crop\_comparison.png}       & Head camera under the three candidate preparations\\
 \bottomrule
 \end{tabular}
 \end{center}
