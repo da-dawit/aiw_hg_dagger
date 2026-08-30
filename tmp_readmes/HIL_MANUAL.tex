@@ -283,21 +283,6 @@ untouched:
 git checkout -b feature-a2-backup backup/feature-a2
 \end{lstlisting}
 
-\subsection{Confirming the working copy}
-
-\texttt{ai\_worker-wip} also carries a \texttt{tmp\_readmes} directory, with an
-older set of files, so the directory's presence does not identify the branch.
-The file list does: \texttt{HIL\_MANUAL.tex}, \texttt{IMPROVEMENTS.md},
-\texttt{OPERATING\_MANUAL.md} and the architecture diagram source and PDF.
-
-\remark{\texttt{tmp\_readmes/} is documentation and is not part of the software.
-The directory is excluded by \texttt{.gitignore} and the files are present only
-because they were staged with \texttt{git add -f}; nothing in the build, the
-launch files or the runtime reads from it. A new file placed there is invisible
-to \texttt{git status} and must be staged with \texttt{git add -f} to be
-committed. This manual builds with \texttt{pdflatex} run twice, or unmodified on
-Overleaf.}
-
 % =====================================================================
 \newpage
 \section{Installing the training environment}
@@ -362,17 +347,16 @@ uv run huggingface-cli login --token $HF_TOKEN
 training begins. Without \texttt{crop\_to\_square.patch} every camera is
 letterboxed, which differs from the configuration the base checkpoint was
 trained under. Without \texttt{mixture\_ratio.patch} the \texttt{path@ratio}
-syntax is not parsed, all datasets are collapsed into one specification, and the
-mixture ratios are silently ignored.}
+syntax is not parsed, all datasets are collapsed into one specification.}
 
 \subsection{Base checkpoint}
 
 \begin{lstlisting}[style=sh]
 huggingface-cli download dawity/groot_screwing35 \
-    --include "16d_30k/checkpoint-30000/*" --local-dir runs/
+    --include "<your-chkpt>" --local-dir runs/
 \end{lstlisting}
 
-The checkpoint is approximately 6.5\,GB and contains weights only.
+Your base checkpoint needs to be downloaded too. For instance, a checkpoint could have been pushed to HF, so please download as above.
 
 % =====================================================================
 \newpage
@@ -388,9 +372,9 @@ Section~\ref{sec:legend}.
 \toprule
 \textbf{Line} & \textbf{Meaning}\\
 \midrule
-Heavy solid (red)    & Human commands the arms\\
-Heavy dashed (blue)  & Policy commands the arms\\
-Light solid          & Status, feedback and control plane\\
+\textcolor{red}{Red solid}      & Human commands the arms\\
+\textcolor{blue}{Blue dashed}   & Policy commands the arms\\
+\textcolor{black}{Black solid}  & Status, feedback and control plane\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -398,103 +382,11 @@ Light solid          & Status, feedback and control plane\\
 % ---------------------------------------------------------------
 \begin{landscape}
 \thispagestyle{empty}
+\vspace*{\fill}
 \begin{center}
-{\large\bfseries Figure 1.\ \ Runtime control path}
+  \makebox[\linewidth][c]{\includegraphics[width=1.05\linewidth,height=1.05\textheight,keepaspectratio]{figs/ai_worker.png}}
 \end{center}
-\vspace{1mm}
-
-\begin{adjustbox}{max width=\linewidth,max totalheight=0.84\textheight,center}
-\begin{tikzpicture}[x=1cm,y=1cm,
-  proc/.style={draw,align=center,font=\small,minimum height=9mm,inner sep=3pt},
-  hw/.style={draw,dashed,align=center,font=\small,minimum height=8mm,inner sep=3pt},
-  cont/.style={draw,inner sep=5mm,line width=0.4pt},
-  ed/.style={-{Stealth[length=2mm]},line width=0.4pt},
-  hu/.style={-{Stealth[length=2mm]},line width=1.3pt,draw=figHuman},
-  au/.style={-{Stealth[length=2mm]},line width=1.3pt,dashed,draw=figAuto},
-  lb/.style={font=\scriptsize,fill=white,inner sep=1pt},
-  nt/.style={font=\scriptsize,align=left}]
-
-\node[hw]   (lhw) at ( 2.6,14.4){A2 leader hardware\\\scriptsize Dynamixel, two joysticks, tact switches};
-\node[proc] (joy) at ( 2.6,12.4){\texttt{a2\_joystick\_controller}};
-\node[proc] (bc)  at ( 2.6,10.2){\texttt{a2\_joint\_trajectory\_}\\\texttt{command\_broadcaster}};
-\node[proc] (br)  at ( 2.6, 7.6){\texttt{leader\_bridge.py}\\\scriptsize active-arms bridge, pause gesture};
-\node[proc] (tel) at ( 9.4,11.4){\texttt{cyclo\_teleoperation\_node}\\\scriptsize Mode 1 absolute, mode 2 relative delta\\\scriptsize SG2 default: mode 2\\\scriptsize Slow start disabled in mode 2\\\scriptsize Gripper retains teleoperated value on disengage};
-\node[hw]   (fhw) at (18.2,14.4){SG2 follower hardware};
-\node[proc] (fc)  at (18.2,11.8){Follower \texttt{ros2\_control}\\\scriptsize arm\_l, arm\_r, head, lift,\\\scriptsize swerve\_drive, joint\_state\_broadcaster};
-\node[proc] (cam) at (18.2, 9.0){Cameras\\\scriptsize ZED head (L, R), two D405 wrist\\\scriptsize Four recorded, three supplied to the policy};
-\begin{scope}[on background layer]
-\node[cont,fill=figWorker,fit=(lhw)(joy)(bc)(br)(tel)(fhw)(fc)(cam),
- label={[font=\bfseries\small,anchor=north west]north west:\ \texttt{ai\_worker}}]{};
-\end{scope}
-
-\node[proc,text width=60mm] (pol) at (25.4,12.0)
- {\texttt{groot\_server}\\[0.8mm]
-  \scriptsize \texttt{main\_runtime}: control loop\\
-  \scriptsize \texttt{engine\_process}: GR00T-N1.7, TensorRT DiT\\[0.8mm]
-  \scriptsize Reads observation, writes arm command\\
-  \scriptsize Sixteen dimensions, arms only\\
-  \scriptsize Gripper hold on sustained measured effort};
-\begin{scope}[on background layer]
-\node[cont,fill=figPolicy,fit=(pol),label={[font=\bfseries\small]north:\texttt{groot\_server}}]{};
-\end{scope}
-
-\node[proc] (orc) at ( 3.8,3.9){\texttt{orchestrator\_node}\\\scriptsize session and policy state machine};
-\node[proc] (rb)  at (10.6,3.9){\texttt{rosbridge\_websocket}\\\scriptsize port 7090};
-\node[proc] (cd)  at ( 3.8,1.5){\texttt{cyclo\_data\_node}\\\scriptsize recording, conversion, dataset services};
-\node[proc] (sup) at (10.6,1.5){\texttt{supervisor\_api}\\\scriptsize port 7100};
-\begin{scope}[on background layer]
-\node[cont,fill=figCyclo,fit=(orc)(rb)(cd)(sup),
- label={[font=\bfseries\small,anchor=south west]south west:\ \texttt{cyclo\_intelligence}}]{};
-\end{scope}
-
-\node[proc,text width=60mm] (ui) at (25.4,3.4)
- {Operator interface\\[0.8mm]
-  \scriptsize ROSLIB over rosbridge; HTTP to \texttt{supervisor\_api}\\[0.8mm]
-  \scriptsize Human indicator: policy paused and teleoperation engaged\\
-  \scriptsize Correction-length counter\\
-  \scriptsize Sub-task instruction control};
-\begin{scope}[on background layer]
-\node[cont,fill=figUI,fit=(ui),label={[font=\bfseries\small]north:Browser}]{};
-\end{scope}
-
-\draw[ed] (lhw) -- (joy);
-\draw[ed] (joy) -- node[lb,right]{T2} (bc);
-\draw[hu] (bc.east) -- node[lb,above,pos=0.45]{T3} (tel.west);
-\draw[ed] (joy.west) -- ++(-1.4,0) |- node[lb,pos=0.22,left]{T15} (br.west);
-\draw[ed] (tel.south west) -- node[lb,above,pos=0.4]{T4} (br.north east);
-\draw[hu] (tel.east) -- node[lb,above,pos=0.5]{T6} (fc.west);
-\draw[au] (pol.west) -- node[lb,above,pos=0.5]{T6} (fc.east);
-\draw[ed] (fhw) -- (fc);
-\draw[ed] (fc) -- (cam);
-\draw[ed] (cam.east) -- ++(2.2,0) |- node[lb,pos=0.25,right]{T7} (pol.south east);
-\draw[ed] (orc.west) -- ++(-2.2,0) |- node[lb,pos=0.22,left]{T14} (bc.west);
-\draw[ed] (br.south) -- node[lb,left,pos=0.6]{T5} (orc.north);
-\draw[ed] (br.south east) -- ++(2.6,-2.6) -| node[lb,pos=0.15,above]{T16} (rb.north);
-\draw[ed] (orc) -- node[lb,above]{T9} (rb);
-\draw[ed] (rb.east) -- node[lb,above,pos=0.4]{T10} (ui.west);
-\draw[ed] (orc.south) -- node[lb,left]{T11} (cd.north);
-\draw[ed] (sup.east) -- ++(2.0,0) |- node[lb,pos=0.25,below]{HTTP} (ui.south west);
-\draw[ed] (rb.north east) -- ++(2.0,3.2) -| node[lb,pos=0.2,left]{T8} (pol.south west);
-
-\node[draw,text width=84mm,align=left,anchor=north west,font=\scriptsize,inner sep=3pt] at (0.2,-0.9)
- {\textbf{Intervention sequence}\\[0.6mm]
-  1.\ Joystick drag-down, held one second. Policy suspends.\\
-  2.\ Tact switch. The corresponding arm engages.\\
-  3.\ Tact switch. The arm disengages; the gripper retains its value.\\
-  4.\ Joystick drag-down, held one second. Policy resumes.\\[0.6mm]
-  The intervals 1--2 and 3--4 are suspended with no arm engaged and are labelled $-1$.};
-
-\node[nt,text width=74mm,anchor=north west] at (12.4,-0.9)
- {\textbf{T6 is written by both the teleoperation node and the policy.}
-  Consequently the recorded action is valid in either mode. Mutual exclusion is
-  enforced by T14, not by separate topics.};
-
-\node[nt,text width=74mm,anchor=north west] at (12.4,-3.4)
- {\textbf{T18} (home pose) is published from the browser directly to
-  \texttt{ai\_worker}, bypassing the orchestrator. It is the only interface
-  action that does so.};
-\end{tikzpicture}
-\end{adjustbox}
+\vspace*{\fill}
 \end{landscape}
 
 % ---------------------------------------------------------------
@@ -551,10 +443,12 @@ Light solid          & Status, feedback and control plane\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
   \scriptsize \textbf{intervention, reward, done, sample\_weight}};
 \node[proc,fill=figFlag,text width=54mm,line width=1.2pt] (v21) at (26.0,4.6)
- {\textbf{LeRobot v2.1} as written by \texttt{to\_lerobot\_v21.py}\\\scriptsize (the format Isaac-GR00T requires)\\[0.6mm]
+ {\textbf{LeRobot v2.1} as written by \texttt{to\_lerobot\_v21.py}\\
+  \scriptsize the format Isaac-GR00T requires\\[0.6mm]
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
-  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done, sample\_weight}}\\\scriptsize \textcolor{figHuman}{\textbf{not emitted by this writer}}};
+  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done, sample\_weight}}\\
+  \scriptsize \textcolor{figHuman}{\textbf{not emitted by this writer}}};
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
 
@@ -583,7 +477,7 @@ ros2 launch ffw_bringup ffw_a2_leader_ai.launch.py
 python3 leader_bridge.py
 \end{lstlisting}
 
-The leader and follower may both remain active for the duration of a session.
+The leader and follower \textbf{may both remain active for the duration of a session.}
 They do not contend, because T14 suppresses the leader chain while the policy is
 driving. Contention between the two indicates that T14 is not being received.
 
@@ -674,7 +568,7 @@ appropriate. The interface displays a counter against this threshold.}
 
 The robot configuration file is the authoritative specification. Every topic
 referenced there is subscribed by the recorder, and the observation topics are
-additionally subscribed by the live inference path.
+additionally subscribed by the live inference path. This pipeline is comparable to the rosbag2 recorder Cyclo Intelligence offers.
 
 \begin{lstlisting}[style=yml,caption={\texttt{shared/robot\_configs/ffw\_sg2\_rev1\_config.yaml}, abridged}]
 observation:
@@ -889,16 +783,9 @@ Every dataset exported for GR00T training therefore omits the operator/policy
 label, and the correction frames become indistinguishable from the policy's own
 behaviour.}
 
-\remark{This is a property of the writer, not of the format. LeRobot v2.1 places
-no restriction on additional columns, and \texttt{to\_lerobot\_v21.py} already
-emits one: \texttt{subtask\_index} is not part of stock LeRobot, is declared in
-\texttt{meta/info.json}, and is carried in the parquet files without difficulty.
-The four online-RL columns are added the same way, in the same function.}
-
-The remedy is to mirror the v3.0 schema block in the v2.1 writer, alongside the
-existing \texttt{subtask\_index} block that already demonstrates the pattern.
-The flags are computed and attached to the episode structure regardless of
-output format; no additional computation or parameter passing is required.
+The remedy is to mirror the v3.0 schema block in the v2.1 writer. The flags are
+already computed and attached to the episode structure; no additional
+computation or parameter passing is required.
 
 \begin{lstlisting}[style=py,caption={Schema addition required in \texttt{to\_lerobot\_v21.py}}]
 has_hil_feature = any(ep.intervention_flags for ep in episodes)
@@ -914,6 +801,39 @@ The corresponding array population and the feature declaration in
 tooling that reads the feature list will not observe a column present only in
 the parquet files.
 
+\subsection{How the label is consumed}
+\label{sec:consumed}
+
+The training process never reads an intervention column. Neither
+\texttt{dagger\_human} nor \texttt{dagger\_auto} contains one, and Isaac-GR00T
+makes no reference to \texttt{intervention}, \texttt{task\_is\_policy} or
+\texttt{sample\_weight} anywhere in its source.
+
+The label is a build-time artefact. It is read once, at export, to determine
+which output dataset each frame belongs to, and is then discarded.
+
+\begin{center}
+\small
+\begin{tabular}{@{}rl@{}}
+\toprule
+\textbf{Stage} & \textbf{Use of the label}\\
+\midrule
+Conversion & Computed from the inference phase\\
+Export     & Read to partition frames; then dropped\\
+Training   & Not present. The partition carries the distinction\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This follows from Isaac-GR00T having no per-frame loss weighting: a column would
+be of no use to the trainer even if it were present. The corrections are
+weighted by assigning whole datasets a mixture ratio instead.
+
+\remark{The consequence is that a missing column obstructs the \emph{partition},
+not the training. The labels are required only long enough to divide the frames,
+which is why a reconstruction adequate for that purpose is sufficient, and why
+the reference session could be trained at all despite the export lacking them.}
+
 \subsection{Polarity}
 
 \caution{\texttt{intervention} uses 1 for the operator and 0 for the policy.
@@ -923,12 +843,27 @@ mismatch raises no error; the affected run trains on the complement of the
 intended frames. A single convention should be emitted, its polarity stated in
 \texttt{meta/info.json}, and consumers should assert on the field name.}
 
-\subsection{Interim measure}
+\subsection{Available responses}
 
-Both formats should be converted and the v3.0 output retained, as it is the only
-export carrying the labels. Where a v2.1-only export already exists, the labels
-may be reconstructed by the procedure in Section~\ref{sec:recover}. That
-procedure yields an estimate, not ground truth.
+Nothing in the v2.1 output compensates for the omission. Three responses exist,
+and they are not alternatives to one another: the first prevents the problem,
+the second repairs it, the third removes it.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llp{6.0cm}@{}}
+\toprule
+\textbf{Situation} & \textbf{Response} & \textbf{Result}\\
+\midrule
+Before conversion & Convert both formats and retain the v3.0 output & Exact labels, at the cost of a second copy\\
+Export already made & Reconstruct by Section~\ref{sec:recover} & An estimate; span boundaries are approximate\\
+Permanently & Emit the columns from the v2.1 writer & Exact labels, no second copy\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Until the third is done, the first should be routine. The second is recovery,
+not practice.
 
 % =====================================================================
 \newpage
