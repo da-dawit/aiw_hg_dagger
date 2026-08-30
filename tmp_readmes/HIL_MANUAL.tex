@@ -1,0 +1,950 @@
+% =====================================================================
+%  Human-in-the-Loop Robot Learning on the FFW SG2 -- System Manual
+%
+%  Compile: pdflatex (twice, for the ToC) or upload to Overleaf as-is.
+%  Packages are all standard TeX Live / Overleaf; nothing exotic.
+%
+%  IMAGE PLACEHOLDERS
+%  Every figure uses \placeholder{file}{caption-ish hint}{height}. Drop the
+%  real file next to this .tex and swap \placeholder for \includegraphics --
+%  the caption and label stay put. Placeholders are listed in Appendix C.
+%
+%  FULL-PAGE DIAGRAMS
+%  The three architecture diagrams each occupy a whole landscape page and are
+%  scaled with adjustbox to fill it. Note the trap: \resizebox{\textwidth}{!}
+%  constrains WIDTH ONLY, so a tall picture silently overflows and the page
+%  comes out blank. adjustbox's "max totalheight" is what prevents that.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{pdflscape}
+\usepackage{adjustbox}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{helvet}
+\usepackage[colorlinks=true,linkcolor=linknavy,urlcolor=linknavy,
+            citecolor=linknavy]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
+
+\renewcommand{\familydefault}{\sfdefault}
+
+% ---------------- palette ----------------
+\definecolor{linknavy}{RGB}{20,70,140}
+\definecolor{cAiWorker}{RGB}{225,240,255}
+\definecolor{cCyclo}{RGB}{255,238,215}
+\definecolor{cPolicy}{RGB}{232,225,255}
+\definecolor{cUI}{RGB}{225,250,230}
+\definecolor{cDisk}{RGB}{238,238,238}
+\definecolor{cBad}{RGB}{255,226,226}
+\definecolor{cGood}{RGB}{226,245,226}
+\definecolor{eHuman}{RGB}{178,58,58}
+\definecolor{eAuto}{RGB}{38,108,188}
+\definecolor{eData}{RGB}{95,95,95}
+\definecolor{codebg}{RGB}{247,247,247}
+\definecolor{codekw}{RGB}{20,80,160}
+\definecolor{codecm}{RGB}{110,120,110}
+\definecolor{codestr}{RGB}{150,60,20}
+
+% ---------------- code ----------------
+\lstdefinestyle{base}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecm}\itshape,
+  stringstyle=\color{codestr},
+  numberstyle=\tiny\color{gray},
+  breaklines=true, breakatwhitespace=false,
+  showstringspaces=false, frame=leftline, framesep=6pt,
+  rulecolor=\color{gray!50}, xleftmargin=10pt,
+  columns=fullflexible, keepspaces=true,
+}
+\lstdefinestyle{py}{style=base,language=Python}
+\lstdefinestyle{sh}{style=base,language=bash}
+\lstdefinestyle{yml}{style=base,
+  morekeywords={topic,msg_type,joint_names,observation,action,recording,
+                extra_topics,images,state,rotation_deg,slow_start,enabled},
+  morecomment=[l]{\#}}
+\lstset{style=base}
+
+% ---------------- boxes ----------------
+\newcommand{\keybox}[2]{%
+  \par\vspace{2mm}\noindent
+  \begin{tikzpicture}
+    \node[draw=gray!60,fill=#1,rounded corners=2pt,inner sep=3mm,
+          text width=\dimexpr\linewidth-8mm\relax,align=left] {#2};
+  \end{tikzpicture}\par\vspace{2mm}}
+\newcommand{\warn}[1]{\keybox{cBad}{#1}}
+\newcommand{\good}[1]{\keybox{cGood}{#1}}
+\newcommand{\note}[1]{\keybox{cDisk}{#1}}
+
+% ---------------- image placeholder ----------------
+% #1 filename to drop in   #2 what the picture should show   #3 height
+\newcommand{\placeholder}[3]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node[draw=gray!70,dashed,fill=gray!8,rounded corners=3pt,
+          minimum height=#3,minimum width=0.86\linewidth,align=center,
+          font=\small,text width=0.80\linewidth]
+      {\textbf{[ image placeholder ]}\\[1.5mm]
+       \texttt{\detokenize{#1}}\\[1.5mm]
+       \itshape #2};
+  \end{tikzpicture}
+  \end{center}}
+
+% ---------------- headers ----------------
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\itshape HIL on the FFW SG2}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.7em}{}
+
+\setlist{itemsep=1mm,parsep=0mm,topsep=1.5mm}
+
+% =====================================================================
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2.5cm}
+{\Huge\bfseries Human-in-the-Loop\\[2mm] Robot Learning}\\[6mm]
+{\LARGE FFW SG2 $\cdot$ A2 Leader $\cdot$ GR00T-N1.7}\\[10mm]
+{\large System Manual and Operating Guide}\\[16mm]
+
+\begin{tikzpicture}
+\node[draw=gray!50,rounded corners=3pt,inner sep=5mm,text width=12cm,align=left,
+      font=\small,fill=gray!5]
+ {\textbf{What this covers.} How the leader, follower, policy and orchestration
+  fit together; how to run an HG-DAgger session; what lands in the dataset and
+  what silently does not; and how to train and verify from it.\\[2mm]
+  \textbf{Who it is for.} Anyone operating the robot, and anyone changing the
+  recording or conversion code.\\[2mm]
+  \textbf{Status.} Verified against \texttt{cyclo\_intelligence\_backup@main}
+  and \texttt{aiw\_backup@feature-a2}. Numbers come from measured runs, not
+  estimates; where something is unverified it says so.};
+\end{tikzpicture}
+
+\vfill
+{\small ROBOTIS \quad$\cdot$\quad 2026-08-30}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{The system in one page}
+
+Three containers and a browser. Each owns exactly one thing.
+
+\begin{center}
+\begin{tabular}{@{}p{3.6cm}p{11.2cm}@{}}
+\toprule
+\textbf{\texttt{ai\_worker}} & The hardware. Leader arms, follower arms, head,
+lift, swerve base, four cameras. Publishes joint states, consumes trajectory
+commands. Knows nothing about policies or datasets.\\[1mm]
+\textbf{\texttt{groot\_server}} & The policy. GR00T-N1.7 behind a TensorRT DiT.
+Reads observations, writes arm commands. \textbf{16 dimensions --- both arms
+only}; head, lift and base are never commanded by it.\\[1mm]
+\textbf{\texttt{cyclo\_intelligence}} & Orchestration. Session state machine,
+recording, conversion, the HTTP/WebSocket surface the browser talks to.\\[1mm]
+\textbf{browser} & The operator's Online-RL page. Start/stop the policy, take
+over, label subtasks, watch the correction counter.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\good{\textbf{The one fact that explains most of the design.} The teleoperation
+node and the policy publish to the \emph{same} topic --- the arm command
+broadcaster. There is no separate ``policy channel''. That is why a recording is
+valid whether a human or the policy was driving, and it is why a latched
+``policy is active'' flag has to exist to stop the two of them writing at once.}
+
+\subsection{What a session looks like}
+
+You start the policy. It runs. When it does something wrong you take over, fix
+it, and hand back. Those correction frames are the training signal --- that is
+HG-DAgger. The whole system exists to make that loop safe, and to get the
+corrections into a dataset with a label saying which frames were yours.
+
+\placeholder{fig/session_overview.png}{A wide shot of the cell mid-session:
+follower arms on the task, leader arms in the operator's hands, the Online-RL
+page visible on the monitor.}{5.5cm}
+
+% =====================================================================
+\newpage
+\section{Architecture}
+
+The next two pages are full-page diagrams. Read them in order: the first is who
+commands the arms, the second is what happens to the data.
+
+\subsection{Reading the diagrams}
+
+\begin{itemize}
+\item \textcolor{eHuman}{\rule{6mm}{1.2pt}}~a human is commanding the arms
+\item \textcolor{eAuto}{\rule{6mm}{1.2pt}}~the policy is commanding the arms
+\item \textcolor{eData}{\rule{6mm}{0.6pt}}~status, feedback, control plane
+\item Edge labels (\texttt{T1}\dots\texttt{T19}) are defined in
+      Section~\ref{sec:legend}.
+\end{itemize}
+
+% ---------------------------------------------------------------
+\begin{landscape}
+\thispagestyle{empty}
+\begin{center}
+{\LARGE\bfseries Figure 1 --- Runtime control path}\\[1mm]
+{\small Who commands the arms, and how control is handed over}
+\end{center}
+\vspace{1mm}
+
+% adjustbox constrains BOTH dimensions. \resizebox would constrain width only,
+% and a tall picture then overflows the page and renders blank.
+\begin{adjustbox}{max width=\linewidth,max totalheight=0.84\textheight,center}
+\begin{tikzpicture}[x=1cm,y=1cm,
+  proc/.style={draw,rounded corners=2pt,align=center,font=\small,
+               minimum height=9mm,inner sep=3pt,fill=white},
+  hw/.style={draw,dashed,rounded corners=2pt,align=center,font=\small,
+             minimum height=8mm,inner sep=3pt,fill=white},
+  cont/.style={draw,rounded corners=4pt,inner sep=5mm,line width=0.4pt},
+  ed/.style={-{Stealth[length=2mm]},draw=eData,line width=0.5pt},
+  hu/.style={-{Stealth[length=2mm]},draw=eHuman,line width=1.1pt},
+  au/.style={-{Stealth[length=2mm]},draw=eAuto,line width=1.1pt},
+  lb/.style={font=\scriptsize,fill=white,inner sep=1pt},
+  nt/.style={font=\scriptsize\itshape,align=left}]
+
+\node[hw]   (lhw)   at ( 2.6,14.4){A2 Leader HW\\\scriptsize Dynamixel $\cdot$ 2 joysticks $\cdot$ tact};
+\node[proc] (joy)   at ( 2.6,12.4){\texttt{a2\_joystick\_controller}\\\scriptsize ros2\_control};
+\node[proc] (bc)    at ( 2.6,10.2){\texttt{a2\_joint\_trajectory\_}\\\texttt{command\_broadcaster}\\\scriptsize the leader's own arm command};
+\node[proc] (br)    at ( 2.6, 7.6){\texttt{leader\_bridge.py}\\\scriptsize active\_arms bridge\\\scriptsize + pause/resume drag-gesture};
+\node[proc] (tel)   at ( 9.4,11.4){\texttt{cyclo\_teleoperation\_node}\\\scriptsize mode 1 absolute MoveJ / mode 2 relative delta\\\scriptsize \textbf{SG2 default is mode 2} (T17 selects)\\\scriptsize goal $=$ follower\_anchor $+$ (leader\_now $-$ leader\_anchor)\\\scriptsize \textbf{slow\_start disabled} --- nothing sweeps on engage\\\scriptsize gripper holds its teleoped value on disengage};
+\node[hw]   (fhw)   at (18.2,14.4){SG2 Follower HW\\\scriptsize 2 arms $\cdot$ head $\cdot$ lift $\cdot$ swerve base};
+\node[proc] (fc)    at (18.2,11.8){Follower \texttt{ros2\_control}\\\scriptsize arm\_l / arm\_r / head / lift /\\\scriptsize swerve\_drive / joint\_state\_broadcaster};
+\node[proc] (cam)   at (18.2, 9.0){Cameras\\\scriptsize ZED head L+R $\cdot$ 2$\times$ D405 wrist\\\scriptsize \textbf{4 recorded}, policy is fed \textbf{3}};
+\begin{scope}[on background layer]
+\node[cont,fill=cAiWorker,fit=(lhw)(joy)(bc)(br)(tel)(fhw)(fc)(cam),
+  label={[font=\bfseries,anchor=north west]north west:ai\_worker container}]{};
+\end{scope}
+
+\node[proc,text width=56mm] (pol) at (25.0,12.0)
+ {\texttt{groot\_server}\\[1mm]
+  \scriptsize\texttt{main\_runtime} --- control loop\\
+  \scriptsize\texttt{engine\_process} --- GR00T-N1.7, TensorRT DiT\\[1mm]
+  \scriptsize reads observation (T7), writes action (T6)\\
+  \scriptsize \textbf{D $=$ 16, arms only}\\
+  \scriptsize gripper hold: freeze commanded position once\\
+  \scriptsize measured effort $\geq$ threshold for a dwell};
+\begin{scope}[on background layer]
+\node[cont,fill=cPolicy,fit=(pol),label={[font=\bfseries]north:groot\_server}]{};
+\end{scope}
+
+\node[proc] (orc) at ( 3.8,3.9){\texttt{orchestrator\_node}\\\scriptsize session + policy state machine};
+\node[proc] (rb)  at (10.6,3.9){\texttt{rosbridge\_websocket}\\\scriptsize port 7090};
+\node[proc] (cd)  at ( 3.8,1.5){\texttt{cyclo\_data\_node}\\\scriptsize rosbag\_recorder / convert / edit / hub};
+\node[proc] (sup) at (10.6,1.5){\texttt{supervisor\_api}\\\scriptsize FastAPI, port 7100 \texttt{/api}};
+\begin{scope}[on background layer]
+\node[cont,fill=cCyclo,fit=(orc)(rb)(cd)(sup),
+  label={[font=\bfseries,anchor=south west]south west:cyclo\_intelligence container}]{};
+\end{scope}
+
+\node[proc,text width=56mm] (ui) at (25.0,3.4)
+ {Browser --- Online-RL page\\[1mm]
+  \scriptsize ROSLIB.js over rosbridge $\cdot$ HTTP to supervisor\_api\\[1mm]
+  \scriptsize \textbf{HUMAN} badge $=$ \texttt{policyPaused \&\& teleopEngaged}\\
+  \scriptsize live 40-frame correction counter\\
+  \scriptsize per-phase instruction dropdown (T19)};
+\begin{scope}[on background layer]
+\node[cont,fill=cUI,fit=(ui),label={[font=\bfseries]north:operator's browser}]{};
+\end{scope}
+
+\draw[ed] (lhw) -- node[lb,right]{raw ADC} (joy);
+\draw[ed] (joy) -- node[lb,right]{T2} (bc);
+\draw[hu] (bc.east) -- node[lb,above,pos=0.45]{T3} (tel.west);
+\draw[ed] (joy.west) -- ++(-1.4,0) |- node[lb,pos=0.22,left]{T15} (br.west);
+\draw[ed] (tel.south west) -- node[lb,above,pos=0.4]{T4} (br.north east);
+\draw[hu] (tel.east) -- node[lb,above,pos=0.5]{\textbf{T6} human} (fc.west);
+\draw[au] (pol.west) -- node[lb,above,pos=0.5]{\textbf{T6} policy} (fc.east);
+\draw[ed] (fhw) -- (fc);
+\draw[ed] (fc) -- (cam);
+\draw[ed] (cam.east) -- ++(2.2,0) |- node[lb,pos=0.25,right]{T7} (pol.south east);
+\draw[ed] (orc.west) -- ++(-2.2,0) |- node[lb,pos=0.22,left]{T14 \emph{latched}} (bc.west);
+\draw[ed] (br.south) -- node[lb,left,pos=0.6]{T5 \emph{latched}} (orc.north);
+\draw[ed] (br.south east) -- ++(2.6,-2.6) -| node[lb,pos=0.15,above]{T16} (rb.north);
+\draw[ed] (orc) -- node[lb,above]{T9} (rb);
+\draw[ed] (rb.east) -- node[lb,above,pos=0.4]{T10 \emph{latched}} (ui.west);
+\draw[ed] (orc.south) -- node[lb,left]{T11} (cd.north);
+\draw[ed] (sup.east) -- ++(2.0,0) |- node[lb,pos=0.25,below]{HTTP} (ui.south west);
+\draw[ed] (rb.north east) -- ++(2.0,3.2) -| node[lb,pos=0.2,left]{T8} (pol.south west);
+
+\node[proc,text width=86mm,align=left,anchor=north west] at (0.2,-0.9)
+ {\textbf{The operator's takeover loop}\\[0.5mm]
+  \scriptsize 1. joystick drag-down $\geq$1\,s \ $\to$ T16 \ $\to$ INFERENCING $\to$ \textbf{PAUSED}\\
+  \scriptsize 2. tact press \ $\to$ T2 \texttt{COMMAND\_TOGGLE} \ $\to$ that arm \textbf{engages}\\
+  \scriptsize 3. tact press again \ $\to$ arm \textbf{disengages}, gripper holds its teleoped value\\
+  \scriptsize 4. joystick drag-down $\geq$1\,s \ $\to$ T16 \ $\to$ PAUSED $\to$ \textbf{INFERENCING}\\[0.8mm]
+  \scriptsize Gaps 1$\to$2 and 3$\to$4 are PAUSED with no arm engaged: labelled $-1$, not human.};
+
+\node[nt,text width=76mm,anchor=north west] at (12.4,-0.9)
+ {\textbf{T6 is ONE topic, written by BOTH sides}\\
+  \texttt{\scriptsize /leader/joint\_trajectory\_command\_}\\
+  \texttt{\scriptsize broadcaster\_\{left,right\}/joint\_trajectory}\\[0.8mm]
+  Teleop node and policy publish to the same place, so \texttt{action} is valid
+  in either mode --- no stale-leader pose. \textbf{T14} stops them contending.};
+
+\node[nt,text width=76mm,anchor=north west] at (12.4,-4.6)
+ {\textbf{T18 Home} goes straight from the browser to \texttt{ai\_worker} over
+  rosbridge --- the only UI action that skips the orchestrator.};
+\end{tikzpicture}
+\end{adjustbox}
+\end{landscape}
+
+% ---------------------------------------------------------------
+\begin{landscape}
+\thispagestyle{empty}
+\begin{center}
+{\LARGE\bfseries Figure 2 --- Recording and conversion}\\[1mm]
+{\small Every recorded topic, and where the online-RL labels are lost}
+\end{center}
+\vspace{1mm}
+
+\begin{adjustbox}{max width=\linewidth,max totalheight=0.84\textheight,center}
+\begin{tikzpicture}[x=1cm,y=1cm,
+  proc/.style={draw,rounded corners=2pt,align=center,font=\small,inner sep=3pt,fill=white},
+  disk/.style={draw,align=center,font=\small,fill=cDisk,inner sep=3pt},
+  bad/.style={draw,align=center,font=\small,fill=cBad,inner sep=3pt,thick},
+  cont/.style={draw,rounded corners=4pt,inner sep=5mm,line width=0.4pt},
+  ed/.style={-{Stealth[length=2mm]},draw=eData,line width=0.5pt},
+  lb/.style={font=\scriptsize,fill=white,inner sep=1pt},
+  nt/.style={font=\scriptsize\itshape,align=left}]
+
+\node[proc,text width=80mm,align=left] (obs) at (4.6,12.6)
+ {\textbf{observation.images} --- 4 cameras\\
+  \scriptsize\texttt{cam\_left\_head} \ \texttt{/zed/zed\_node/left/image\_rect\_color/compressed}\\
+  \scriptsize\texttt{cam\_left\_wrist} \ \texttt{/camera\_left/...} \ rot 270\\
+  \scriptsize\texttt{cam\_right\_wrist} \ \texttt{/camera\_right/...} \ rot 270\\
+  \scriptsize\texttt{cam\_right\_head} \ \texttt{/zed/zed\_node/right/...}};
+\node[proc,text width=80mm,align=left] (st) at (4.6,9.6)
+ {\textbf{observation.state} --- 22 dims\\
+  \scriptsize\texttt{upper\_body} \ \texttt{/joint\_states} --- 19 joints:\\
+  \scriptsize\hspace{4mm}\texttt{arm\_l\_joint1..7}, \texttt{gripper\_l\_joint1},\\
+  \scriptsize\hspace{4mm}\texttt{arm\_r\_joint1..7}, \texttt{gripper\_r\_joint1},\\
+  \scriptsize\hspace{4mm}\texttt{head\_joint1..2}, \texttt{lift\_joint}\\
+  \scriptsize\texttt{mobile} \ \texttt{/odom} --- \texttt{linear\_x}, \texttt{linear\_y}, \texttt{angular\_z}};
+\node[proc,text width=80mm,align=left] (ac) at (4.6,6.3)
+ {\textbf{action} --- 20 dims. Each topic is BOTH the policy's\\command target and the record target.\\
+  \scriptsize\texttt{arm\_left} \ \texttt{.../broadcaster\_left/joint\_trajectory}\\
+  \scriptsize\texttt{arm\_right} \ \texttt{.../broadcaster\_right/joint\_trajectory}\\
+  \scriptsize\texttt{head} \ \texttt{/leader/joystick\_controller\_left/joint\_trajectory}\\
+  \scriptsize\texttt{lift} \ \texttt{/leader/joystick\_controller\_right/joint\_trajectory}\\
+  \scriptsize\texttt{mobile} \ \texttt{/cmd\_vel}};
+\node[proc,text width=80mm,align=left] (ex) at (4.6,3.0)
+ {\textbf{recording.extra\_topics} --- in the bag, not training data\\
+  \scriptsize\textcolor{eHuman}{\textbf{/task/inference\_status}} \ \ \textcolor{eHuman}{$\leftarrow$ the intervention source}\\
+  \scriptsize\texttt{/tf} \ $\cdot$ \ \texttt{camera\_info} $\times$4};
+\begin{scope}[on background layer]
+\node[cont,fill=cAiWorker,fit=(obs)(st)(ac)(ex),
+ label={[font=\bfseries,anchor=north west]north west:recorded topics --- \texttt{ffw\_sg2\_rev1\_config.yaml}}]{};
+\end{scope}
+
+\node[disk,text width=46mm] (mc) at (16.4,10.6)
+ {\texttt{/workspace/rosbag2/}\\\texttt{<task>/<episode>/*.mcap}\\+ \texttt{episode\_info.json}};
+\node[proc,text width=54mm] (cv) at (16.4,6.4)
+ {\texttt{base\_converter.py}\\[1mm]
+  \scriptsize resample to 30 fps, causal previous-value\\
+  \scriptsize \texttt{\_assign\_subtask\_indices} --- uses the T19 log\\[1mm]
+  \scriptsize\textbf{\texttt{\_assign\_intervention\_flags}}\\
+  \scriptsize INFERENCING $\to$ \textbf{0} \ \ PAUSED + engaged $\to$ \textbf{1}\\
+  \scriptsize handoff / nobody driving $\to$ \textbf{$-1$}};
+\draw[ed] (obs.east) -- ++(1.6,0) |- (mc.west);
+\draw[ed] (ex.east)  -- ++(1.6,0) |- (mc.west);
+\draw[ed] (mc) -- node[lb,right]{fps $=$ 30} (cv);
+
+\node[disk,text width=56mm] (v30) at (26.0,9.2)
+ {\texttt{LeRobot v3.0}\\[1mm]
+  \scriptsize index $\cdot$ episode\_index $\cdot$ task\_index $\cdot$ timestamp\\
+  \scriptsize observation.state $\cdot$ action $\cdot$ subtask\_index\\[1mm]
+  \scriptsize\textbf{intervention} \ \textbf{reward} \ \textbf{done} \ \textbf{sample\_weight}};
+\node[bad,text width=56mm] (v21) at (26.0,4.4)
+ {\texttt{LeRobot v2.1} --- \textbf{what Isaac-GR00T requires}\\[1mm]
+  \scriptsize index $\cdot$ episode\_index $\cdot$ task\_index $\cdot$ timestamp\\
+  \scriptsize observation.state $\cdot$ action $\cdot$ subtask\_index\\[1mm]
+  \scriptsize\textcolor{eHuman}{\textbf{no intervention $\cdot$ no reward}}\\
+  \scriptsize\textcolor{eHuman}{\textbf{no done $\cdot$ no sample\_weight}}};
+\draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
+\draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
+
+\node[nt,text width=84mm,anchor=north west,text=eHuman] at (20.4,1.6)
+ {\textbf{This is where HG-DAgger dies.} \texttt{\_assign\_intervention\_flags}
+  computes a correct per-frame label and \texttt{to\_lerobot\_v30.py} writes it
+  out. \texttt{to\_lerobot\_v21.py} never does. Isaac requires v2.1, so every
+  GR00T export silently loses the human/policy label and degrades to plain
+  behaviour cloning. See Section~\ref{sec:defect}.};
+\end{tikzpicture}
+\end{adjustbox}
+\end{landscape}
+
+% =====================================================================
+\newpage
+\section{Operating a session}
+
+\subsection{Bring-up order}
+
+Follower, then leader, then the bridge. The order matters: the bridge subscribes
+to topics the other two create.
+
+\begin{lstlisting}[style=sh]
+# 1. follower -- the physical arms/head/lift you are controlling
+ros2 launch ffw_bringup ffw_sg2_follower_ai.launch.py
+
+# 2. leader -- the two hand controllers
+ros2 launch ffw_bringup ffw_a2_leader_ai.launch.py
+
+# 3. the bridge that makes the pause/resume gesture work
+python3 leader_bridge.py
+\end{lstlisting}
+
+\note{\textbf{Check it actually worked, do not assume.} The leader and follower
+can both stay up through a whole inference session --- they do not contend,
+because T14 silences the leader chain while the policy is driving. If the arms
+fight, T14 is not arriving.}
+
+\subsection{The takeover loop}
+\label{sec:loop}
+
+Assume the policy is mid-rollout.
+
+\begin{enumerate}[leftmargin=8mm]
+\item \textbf{Joystick drag-down, hold ${\geq}1$\,s} --- the policy stops.
+      INFERENCING $\to$ PAUSED.
+\item \textbf{Press tact} on the arm you want --- it engages. You are driving;
+      these frames are the training signal.
+\item \textbf{Press tact again} --- it disengages. The gripper holds its
+      teleoped value.
+\item \textbf{Joystick drag-down, hold ${\geq}1$\,s} --- the policy resumes.
+      PAUSED $\to$ INFERENCING.
+\end{enumerate}
+
+\good{\textbf{Engage does not sweep.} SG2 runs control mode 2 (relative delta).
+On engage it captures a leader anchor and a follower anchor and commands
+\\[1mm]\hspace*{4mm}\texttt{goal = follower\_anchor + (leader\_now - leader\_anchor)}\\[1mm]
+so nothing jumps even if leader and follower are far apart. Mode 1 (absolute
+MoveJ) \emph{does} sweep, which is why \texttt{slow\_start} is enabled there and
+disabled in mode 2.}
+
+Two things to internalise:
+
+\begin{itemize}
+\item \textbf{The tact is a toggle.} Same button engages and stops.
+\item \textbf{The drag gesture is one topic with two meanings.} It publishes a
+bare \texttt{std\_msgs/Empty}; the orchestrator decides pause-vs-resume from the
+phase it is currently in.
+\end{itemize}
+
+The gaps between steps 1$\to$2 and 3$\to$4 --- policy paused, no arm engaged,
+nobody driving --- are labelled $-1$ and excluded from training. That is correct.
+You do not need to rush.
+
+\placeholder{fig/ui_online_rl.png}{The Online-RL page mid-takeover: the HUMAN
+badge lit, the 40-frame correction counter part-filled, and the per-phase
+instruction dropdown open.}{7cm}
+
+\subsection{The 40-frame rule}
+
+\warn{\textbf{A correction shorter than 40 frames produces zero training
+samples.} A training sample is a 40-frame window (one GR00T action chunk), not a
+frame. A run of 45 frames yields $45-40+1 = 6$ windows; a run of 120 yields 81.
+\textbf{Sample count is strongly nonlinear in takeover length}, so a few long
+corrections are worth far more than many short nudges. The UI shows a live
+counter against this threshold --- watch it.}
+
+At 30\,Hz, 40 frames is 1.33\,s. In practice, aim for corrections of several
+seconds.
+
+\subsection{What not to do}
+
+\begin{itemize}
+\item \textbf{Do not reach for the tact while the policy is INFERENCING} to
+      trigger a recording. On this robot the tact's recording trigger is
+      disabled (\texttt{record\_triggers\_enabled: false}) precisely because one
+      press also engages that arm --- and an engaged leader publishes to the same
+      topic the policy is driving.
+\item \textbf{Do not save an episode without an outcome.} HG-DAgger aggregation
+      defaults to successful episodes only; a failed episode's human frames are
+      corrections toward an outcome that never worked.
+\end{itemize}
+
+% =====================================================================
+\newpage
+\section{What gets recorded}
+
+The robot config is the single source of truth. Every topic referenced there is
+subscribed by the recorder and, for observations, by the live inference path.
+
+\begin{lstlisting}[style=yml,caption={\texttt{shared/robot\_configs/ffw\_sg2\_rev1\_config.yaml}, abridged}]
+observation:
+  images:
+    cam_left_head:   {topic: /zed/zed_node/left/image_rect_color/compressed}
+    cam_left_wrist:  {topic: /camera_left/.../compressed, rotation_deg: 270}
+    cam_right_wrist: {topic: /camera_right/.../compressed, rotation_deg: 270}
+    cam_right_head:  {topic: /zed/zed_node/right/image_rect_color/compressed}
+  state:
+    upper_body:  {topic: /joint_states}   # 19 joints
+    mobile:      {topic: /odom}           # linear_x, linear_y, angular_z
+
+action:                # each topic is BOTH the policy's target AND the record target
+  arm_left:   {topic: /leader/joint_trajectory_command_broadcaster_left/joint_trajectory}
+  arm_right:  {topic: /leader/joint_trajectory_command_broadcaster_right/joint_trajectory}
+  head:       {topic: /leader/joystick_controller_left/joint_trajectory}
+  lift:       {topic: /leader/joystick_controller_right/joint_trajectory}
+  mobile:     {topic: /cmd_vel}
+
+recording:
+  extra_topics:
+    - /task/inference_status   # source of the per-frame intervention label
+    - /tf
+    - /zed/zed_node/{left,right}/camera_info
+    - /camera_{left,right}/.../camera_info
+\end{lstlisting}
+
+\subsection{Dimensions, and why they differ}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& \textbf{dims} & \textbf{contents}\\
+\midrule
+\texttt{observation.state} & 22 & 19 upper-body joints $+$ 3 odometry\\
+\texttt{action}            & 20 & 16 arm $+$ lift $+$ 3 mobile\\
+policy declares            & \textbf{16} & both arms only\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{observation.state} carries \texttt{head\_joint1/2}; \texttt{action} does
+not. The policy is trained on the first 16 dimensions --- \texttt{arm\_left} and
+\texttt{arm\_right} --- and everything else is recorded but not trained on.
+
+\warn{\textbf{Declaring a dimension you cannot normalise poisons the run.} An
+earlier model declared all 22 and six of them were unusable:
+\texttt{head\_joint1/2} had \texttt{q99}$-$\texttt{q01}$=0$ (a divide by zero),
+and the odometry dims amplified sensor noise. \textbf{27\,\% of the
+proprioceptive input was garbage for an entire 30{,}000-step run.} Any dataset
+gate must refuse a declared dimension whose \texttt{q99}$-$\texttt{q01} or
+\texttt{std} is zero.}
+
+% =====================================================================
+\newpage
+\section{The intervention label}
+\label{sec:defect}
+
+\subsection{How it is computed}
+
+\texttt{/task/inference\_status} publishes \texttt{inference\_phase} on
+transitions only, so the converter forward-fills it onto the frame grid.
+
+\begin{lstlisting}[style=py,caption={\texttt{base\_converter.py} --- \texttt{\_assign\_intervention\_flags}, semantics}]
+INFERENCING                            ->  0   # the policy drove
+PAUSED + teleop engaged + not handoff  ->  1   # the human drove
+PAUSED + leader NOT engaged            -> -1   # nobody driving (your step 1->2 gap)
+handoff transient                      -> -1
+before the first status message        -> -1   # phase genuinely unobserved
+\end{lstlisting}
+
+\subsection{The defect}
+
+\warn{\textbf{\texttt{to\_lerobot\_v30.py} writes the label.
+\texttt{to\_lerobot\_v21.py} does not. Isaac-GR00T requires v2.1.}\\[1.5mm]
+So every dataset exported for GR00T training silently loses the human/policy
+label --- and \texttt{reward}, \texttt{done} and \texttt{sample\_weight} with it.
+Downstream, the split tool refuses to run, and the corrections become
+indistinguishable from the policy's own behaviour.}
+
+\begin{lstlisting}[style=py,caption={The fix --- mirror this block into \texttt{to\_lerobot\_v21.py}}]
+# Online-RL columns, present only when /task/inference_status was in the bag.
+# Isaac-GR00T requires v2.1, so without this every HG-DAgger export loses the
+# human/policy label and degrades to ordinary behaviour cloning.
+has_hil_feature = any(ep.intervention_flags for ep in episodes)
+if has_hil_feature:
+    schema_fields.append(pa.field("intervention",  pa.int64()))
+    schema_fields.append(pa.field("reward",        pa.int64()))
+    schema_fields.append(pa.field("done",          pa.bool_()))
+    schema_fields.append(pa.field("sample_weight", pa.float32()))
+\end{lstlisting}
+
+The matching array fill and the \texttt{hf\_features} entry are also needed ---
+\textbf{declaring it in \texttt{meta/info.json} is not optional}, because tooling
+that reads the feature list will not see a column that exists only in the parquet.
+
+\subsection{Polarity --- the silent one}
+
+\warn{\texttt{intervention} is \textbf{1 = human, 0 = policy, $-1$ = excluded}.
+Some downstream tooling instead expects \texttt{task\_is\_policy}, which is
+\textbf{1 = policy, 0 = human}. \textbf{These are inverses.} Emit one name, state
+the polarity in \texttt{info.json}, and make consumers assert on the name.
+Getting it wrong raises nothing --- the run simply trains on the exact inverse of
+what was intended.}
+
+\subsection{Until it is fixed}
+
+\good{Convert \textbf{both} formats and keep the v3.0 copy. It is the only export
+that carries the labels. If you already have a v2.1-only export, the labels can
+be reconstructed --- see Section~\ref{sec:recover} --- but that is inference, not
+ground truth.}
+
+% =====================================================================
+\newpage
+\section{Recovering labels from an unlabelled export}
+\label{sec:recover}
+
+If a session was exported without the intervention column, the physical
+signature of each takeover still survives in the joint trajectories.
+
+\subsection{Method}
+
+\begin{enumerate}[leftmargin=8mm]
+\item \textbf{Find the pauses.} A takeover is bracketed by two stops --- it takes
+      time to grab the leader and time to hand back. Flag runs where total joint
+      speed stays under a threshold.
+\item \textbf{Pair them.} The span between two consecutive stops inside one
+      subtask is a candidate correction.
+\item \textbf{Confirm with the policy itself.} Run the base checkpoint over
+      frames inside and outside the candidates and compare its prediction to what
+      was recorded.
+\end{enumerate}
+
+\begin{lstlisting}[style=py,caption={Stop detection --- the only step that needs no model}]
+FPS = 30
+S = np.stack(df["observation.state"].to_numpy())[:, :16]     # both arms
+v = np.linalg.norm(np.diff(S, axis=0), axis=1) * FPS * 180/np.pi   # deg/s
+v = np.concatenate([[v[0]], v])
+still = v < 0.8                       # deg/s
+# keep runs of >= 12 frames (0.4 s); the span BETWEEN two such runs,
+# inside one subtask, is a candidate takeover
+\end{lstlisting}
+
+\subsection{Why the third step is the one that proves it}
+
+The policy is a free, calibrated detector of its own behaviour. On frames it
+generated it predicts them back to within its normal open-loop error. On frames a
+human generated it cannot --- if it could have produced that motion, there would
+have been no reason to intervene.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& \textbf{disagreement} & \\
+\midrule
+outside candidate spans & 1.59$^\circ$ & the policy reproducing itself\\
+inside candidate spans  & 3.13$^\circ$ & the policy failing to reproduce a human\\
+\midrule
+\multicolumn{3}{@{}l}{ratio 1.96$\times$, $p \approx 9\times10^{-21}$, and it holds separately in every subtask}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\note{\textbf{Do not use smoothness as the test.} ``The careful parts are
+smoother'' is true whether or not a human is driving --- it is near-circular. The
+disagreement test does not depend on it.}
+
+\placeholder{fig/intervention_recovery.png}{Joint-speed trace for one episode
+with the detected stops marked and the recovered correction spans shaded, above
+a strip of the policy-disagreement values on the same time axis.}{7cm}
+
+\subsection{Result on the reference session}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+& \textbf{frames} & \textbf{share}\\
+\midrule
+human (\texttt{1})            & 6{,}765  & 15.5\,\%\\
+excluded (\texttt{$-1$})      & 4{,}727  & 10.8\,\%\\
+policy (\texttt{0})           & 32{,}192 & 73.7\,\%\\
+\midrule
+\multicolumn{3}{@{}l}{39 interventions, 3 per episode, 13 episodes}\\
+\multicolumn{3}{@{}l}{durations 3.8\,s (place) $\to$ 5.5\,s (grab driver) $\to$ 8.0\,s (screw)}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\newpage
+\section{Training}
+
+\subsection{The three-way split}
+
+Isaac-GR00T has no per-frame loss weighting, so the frame-level scheme (human
+2.0 / auto 0.3 / pre-intervention 0.0) has to be reproduced at the \emph{dataset}
+level via \texttt{mix\_ratio}. The split is done at export time.
+
+\begin{center}
+\begin{tabular}{@{}llrr@{}}
+\toprule
+\textbf{dataset} & \textbf{contents} & \textbf{episodes} & \textbf{frames}\\
+\midrule
+original       & the base demonstrations       & 31 & 55{,}701\\
+\texttt{dagger\_human} & the operator's corrections only & 39 & 6{,}765\\
+\texttt{dagger\_auto}  & the policy's own frames between them & 52 & 31{,}804\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each correction becomes its \emph{own} episode. LeRobot indexes video per
+episode and the policy consumes action chunks, so splicing two corrections
+together would invent a transition that never happened.
+
+\begin{lstlisting}[style=sh,caption={Mixture --- ratios must be explicit}]
+MIX="${ORIG}@0.60:${HUMAN}@0.30:${AUTO}@0.10"
+\end{lstlisting}
+
+\warn{\textbf{Without explicit ratios the loader weights by dataset size.} The
+corrections are 6{,}765 frames against the original's 55{,}701 --- they would
+land at 11\,\% of the mix instead of 30\,\%. Confirm the \texttt{[mixture]} line
+in the launch log shows three specs at the ratios you asked for.}
+
+\subsection{Warm start, not resume}
+
+The released checkpoint carries \textbf{weights only} --- no optimizer state, and
+its cosine LR is annealed to ${\sim}3\times10^{-13}$. Continuation is therefore a
+warm start with a fresh schedule, at a lower LR than the original run.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& \textbf{base run} & \textbf{DAgger continuation}\\
+\midrule
+learning rate      & $1\times10^{-4}$ & $3\times10^{-5}$\\
+global batch       & 128 & 128\\
+frozen             & LLM + visual & same\\
+tuned              & projector + diffusion head & same\\
+\texttt{state\_dropout\_prob} & 0.2 & 0.2\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{How many steps}
+
+Scale by \emph{exposure}, not by wall-clock. What matters is how often each
+dataset is replayed:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+\textbf{steps} & \textbf{original} & \textbf{corrections} & \textbf{time (2$\times$A100)}\\
+\midrule
+1{,}500 & 2.1$\times$ & 8.5$\times$  & 0.4\,h\\
+6{,}000 & 8.3$\times$ & 34$\times$   & 1.5\,h\\
+80{,}000 & 110$\times$ & \textbf{454$\times$} & 20\,h\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\note{A base run of 30{,}000 steps at batch 128 reached 68.9 epochs over the
+original data without degrading, so this architecture tolerates high repetition
+--- diffusion training injects noise every step and state dropout adds more. But
+replaying 39 corrections from one fixed scene 454 times is memorisation, not
+learning. Save often and pick by measurement.}
+
+\subsection{Pick the checkpoint by measurement}
+
+\warn{\textbf{In-training evaluation is not available.} The sharded dataset
+factory asserts \texttt{eval\_strategy == "no"}; setting anything else kills the
+run at startup. Checkpoint selection is therefore strictly post-hoc --- and
+\textbf{not by loss}, because a handful of corrections are easy to memorise and
+training loss keeps falling after held-out performance turns.}
+
+Evaluate in \emph{Cartesian} space, not joint space. A 7-DoF arm reaches the same
+point many ways, so a policy can be degrees off per joint and land correctly ---
+or a degree off and miss by centimetres.
+
+\placeholder{fig/checkpoint_sweep.png}{Held-out grasp error against training
+step for every saved checkpoint, one line per task phase, with the selected
+checkpoint marked.}{7cm}
+
+% =====================================================================
+\newpage
+\section{Verification}
+
+\subsection{Before training --- gate the dataset}
+
+\begin{lstlisting}[style=sh]
+python3 verify_dataset.py --root <dataset> --isaac
+\end{lstlisting}
+
+What a good report looks like, and what each line is actually protecting against:
+
+\begin{center}
+\begin{tabular}{@{}p{5.2cm}p{9.6cm}@{}}
+\toprule
+\textbf{check} & \textbf{catches}\\
+\midrule
+action frame offset & the action column being misaligned from the state it should follow\\
+freeze frames & a frozen arm while the label commands motion\\
+label consistency & the same phase meaning different things across episodes\\
+camera shapes & a camera silently changing resolution\\
+modality declaration & declaring dimensions the model will not receive\\
+\textbf{normaliser} & \textbf{a declared dimension with zero range --- a divide by zero}\\
+dataset version & v3.0 layout where v2.1 is required\\
+video alignment & video and parquet disagreeing after re-encoding\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{After conversion --- confirm the label survived}
+
+\begin{lstlisting}[style=py]
+import pandas as pd, glob, json
+df = pd.concat([pd.read_parquet(f)
+                for f in glob.glob("<ds>/data/**/*.parquet", recursive=True)])
+assert "intervention" in df.columns, "column missing"
+assert "intervention" in json.load(open("<ds>/meta/info.json"))["features"], \
+       "present in parquet but NOT declared in info.json"
+print(df.intervention.value_counts())     # expect all three of 1 / 0 / -1
+\end{lstlisting}
+
+Sanity bounds from the reference session: ${\sim}15\,\%$ human, ${\sim}11\,\%$
+excluded, ${\sim}74\,\%$ policy, 3 interventions per episode.
+
+\subsection{What each level of testing actually proves}
+
+\note{\textbf{Be precise about this.} A successful offline metric is not evidence
+of robot behaviour.
+\\[1mm]\hspace*{4mm}static $<$ offline eval $<$ open-loop $<$ closed-loop $<$ hardware\\[1mm]
+Open-loop error in particular \emph{overstates} closed-loop failure: errors
+accumulate unchecked because the policy never sees the consequences of its own
+actions. On the robot it re-observes every step and corrects.}
+
+\warn{\textbf{And a caution specific to HG-DAgger.} Held-out evaluation scores
+agreement with the \emph{original demonstrations} --- but a correction is
+\emph{by definition} a disagreement with them. A policy that learned your
+corrections well can score \emph{worse} on that metric. Only closed-loop hardware
+separates ``learned the corrections'' from ``got worse''.}
+
+% =====================================================================
+\newpage
+\section{Topic and service reference}
+\label{sec:legend}
+
+{\small
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{@{}p{7mm}p{20mm}p{47mm}p{60mm}@{}}
+\toprule
+\textbf{ID} & \textbf{Kind} & \textbf{Name} & \textbf{Meaning / gotcha}\\
+\midrule
+\endhead
+T1 & PUB/SUB & \texttt{\scriptsize .../tact\_trigger} & Tap emits "left"/"right". Record trigger disabled --- one press also engages that arm.\\
+T2 & PUB/SUB & \texttt{\scriptsize .../joystick\_command} & ENABLE / DISABLE / \textbf{TOGGLE}, per arm. The tact sends TOGGLE --- engage and stop are the same press.\\
+T3 & PUB/SUB & \texttt{\scriptsize .../raw\_joint\_trajectory} & The leader's own arm command, before mode handling.\\
+T4 & PUB/SUB & \texttt{\scriptsize /leader/teleoperation/control\_status} & \texttt{active\_arms} + mode. Use T5.\\
+T5 & PUB/SUB \emph{latched} & \texttt{\scriptsize .../active\_arms\_str} & Same information as T4 as a plain string. The UI badge reads it; the bag should too.\\
+T6 & PUB/SUB & \texttt{\scriptsize .../broadcaster\_\{left,right\}/joint\_trajectory} & \textbf{Written by BOTH the teleop node and the policy.} That is why \texttt{action} is valid in either mode. T14 prevents contention.\\
+T7 & PUB/SUB & \texttt{\scriptsize /joint\_states}, \texttt{/odom}, cameras & Follower feedback and vision. 4 cameras recorded, 3 declared.\\
+T8 & PUB/SUB & \texttt{\scriptsize /<backend>/engine\_command} & Orchestrator $\to$ policy: load / unload / run.\\
+T9 & SERVICE & \texttt{\scriptsize /task/command} & Start / Pause / Resume / Clear policy; recording lifecycle.\\
+T10 & PUB/SUB \emph{latched} & \texttt{\scriptsize /task/inference\_status} & READY 0, LOADING 1, INFERENCING 2, PAUSED 3. \textbf{Transitions only.} Sole source of the intervention label.\\
+T11 & SERVICE & \texttt{\scriptsize /data/recording} & Recording lifecycle, orchestrator $\to$ data node.\\
+T13 & SERVICE & \texttt{\scriptsize /data/convert} & LeRobot conversion. Both flags false means "run both".\\
+T14 & PUB/SUB \emph{latched} & \texttt{\scriptsize /task/policy\_active} & Mirrors INFERENCING into \texttt{ai\_worker}. Gates the leader chain off T6.\\
+T15 & PUB/SUB & \texttt{\scriptsize .../sensorxel\_joy\_values} & Raw joystick axes. The gesture detector watches these.\\
+T16 & PUB/SUB & \texttt{\scriptsize .../toggle\_pause\_request} & Fires once on a ${\geq}1$\,s drag-hold. \textbf{One topic, two meanings}: pause if INFERENCING, resume if PAUSED.\\
+T17 & PUB/SUB & \texttt{\scriptsize .../control\_command} & Mode 1 absolute MoveJ, mode 2 relative delta. \textbf{SG2 default is mode 2.}\\
+T18 & PUB/SUB \emph{latched} & \texttt{\scriptsize /task/home\_in\_progress} & One-shot Home, published straight from the browser --- the only UI action that skips the orchestrator.\\
+T19 & SERVICE & \texttt{\scriptsize /task/command} (UPDATE\_INSTRUCTION) & Appends to \texttt{instruction\_change\_log}, splitting the episode into correctly-timed sub-segments.\\
+\bottomrule
+\end{longtable}}
+
+% =====================================================================
+\newpage
+\section{Troubleshooting}
+
+{\small
+\begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
+\toprule
+\textbf{Symptom} & \textbf{Cause and fix}\\
+\midrule
+\endhead
+Leader and policy fight for the arms & T14 is not arriving. The latched
+\texttt{policy\_active} flag is what silences the leader chain.\\[1mm]
+Every frame has the same subtask label & The instruction was never updated
+during the take, so the episode has one segment. Use the UI's instruction
+control (T19) at each phase change.\\[1mm]
+UI badge shows the wrong mode & The badge is
+\texttt{policyPaused \&\& teleopEngaged}. If one input is stale the badge is
+wrong even though the robot is fine.\\[1mm]
+Correction produced no training samples & The takeover was shorter than 40
+frames. Watch the live counter.\\[1mm]
+Dataset has no \texttt{intervention} column & It was exported v2.1 only. See
+Section~\ref{sec:defect}; recover with Section~\ref{sec:recover}.\\[1mm]
+Training loss falls but the arm gets worse & Expected with few corrections.
+Select by held-out Cartesian error, never by loss.\\[1mm]
+Camera video files come out empty & Conversion ran before the recorder finished
+flushing. Re-run conversion; check the mcap has frames first.\\
+\bottomrule
+\end{longtable}}
+
+% =====================================================================
+\newpage
+\appendix
+\section{Glossary}
+
+\begin{description}[leftmargin=0mm,style=nextline]
+\item[HG-DAgger] Human-Gated DAgger. The policy runs; the human decides when to
+take over. Only the intervened frames are treated as expert data, and they are
+\emph{aggregated} with the original demonstrations rather than replacing them.
+\item[Action chunk] The block of future actions the policy emits per inference.
+40 frames here --- which is why a shorter correction yields nothing.
+\item[Latched topic] A subscriber receives the current value on connect. Used
+for state that must be correct even for a late joiner.
+\item[Relative-delta teleop] Mode 2. Commands the follower by the leader's
+\emph{change} since engage, not to the leader's absolute pose.
+\item[Open-loop evaluation] Replaying recorded observations through the policy
+without letting it affect the robot. Errors accumulate; it overstates failure.
+\end{description}
+
+\section{Reference numbers}
+
+From the reference session and base run. Regenerate rather than quoting from
+memory --- these are measurements, not constants.
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+control rate & 30\,Hz\\
+action chunk / minimum useful correction & 40 frames (1.33\,s)\\
+base checkpoint & 30{,}000 steps, final loss 0.0015\\
+base demonstrations & 31 episodes, 55{,}701 frames\\
+online-RL session & 13 episodes, 43{,}686 frames\\
+recovered interventions & 39 (3 per episode)\\
+human share of the session & 15.5\,\%\\
+held-out validation set & 4 episodes, 6{,}962 frames\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Image placeholders}
+
+Drop these next to the \texttt{.tex} and replace \texttt{\textbackslash placeholder}
+with \texttt{\textbackslash includegraphics}.
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{file} & \textbf{what it should show}\\
+\midrule
+\texttt{fig/session\_overview.png}      & the cell mid-session, operator at the leader\\
+\texttt{fig/ui\_online\_rl.png}         & Online-RL page with HUMAN badge and counter\\
+\texttt{fig/intervention\_recovery.png} & joint speed + detected spans + disagreement\\
+\texttt{fig/checkpoint\_sweep.png}      & held-out error vs training step\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}
