@@ -208,16 +208,41 @@ visible.}{5cm}
 \midrule
 \texttt{da-dawit/aiw\_backup}                & \texttt{feature-a2} & Robot-side packages; this manual\\
 \texttt{da-dawit/cyclo\_intelligence\_backup} & \texttt{main}       & Orchestration, recording, conversion\\
+\texttt{da-dawit/hg-dagger}                  & \texttt{main}       & Training, evaluation and dataset tooling\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Both are private. Access is by SSH key.
+The first two are private; access is by SSH key.
 
 \begin{lstlisting}[style=sh]
 git clone git@github.com:da-dawit/aiw_backup.git
 git clone git@github.com:da-dawit/cyclo_intelligence_backup.git
+git clone git@github.com:da-dawit/hg-dagger.git
 \end{lstlisting}
+
+\texttt{hg-dagger} contains the scripts referenced throughout
+Sections~\ref{sec:train} to~\ref{sec:verify}:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Path} & \textbf{Purpose}\\
+\midrule
+\texttt{scripts/verify\_dataset.py}      & Dataset validation gate\\
+\texttt{scripts/fix\_dagger\_dataset.py} & Repair a converted online-RL dataset\\
+\texttt{scripts/split\_dagger.py}        & Partition by intervention label\\
+\texttt{configs/export\_dagger\_split.py}& Write the partition as LeRobot datasets\\
+\texttt{configs/06\_train\_dagger.sh}    & Training launcher\\
+\texttt{scripts/checkpoint\_sweep.py}    & Held-out error per checkpoint\\
+\texttt{scripts/rollout3d.py}            & Cartesian rollout evaluation\\
+\texttt{scripts/attn\_map.py}            & Attention diagnostics\\
+\texttt{configs/roi\_hybrid.json}        & Per-camera crop specification\\
+\texttt{configs/crop\_to\_square.patch}  & Required patch to Isaac-GR00T\\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \subsection{Branch selection}
 
@@ -301,6 +326,82 @@ pdflatex HIL_MANUAL.tex
 Figure placeholders are listed in Appendix~C. Each is a dashed frame naming the
 file it expects; replace the \texttt{\textbackslash placeholder} call with
 \texttt{\textbackslash includegraphics} once the image exists.
+
+% =====================================================================
+\newpage
+\section{Installing the training environment}
+\label{sec:install}
+
+Training is performed off the robot, on a machine with two or more GPUs of at
+least 40\,GB each. The model is loaded in FP32 during training, so the
+requirement is memory rather than throughput.
+
+\subsection{Memory requirement}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Component} & \textbf{Memory}\\
+\midrule
+Parameters, FP32              & 12.6\,GB\\
+Gradients, FP32               & 6.5\,GB\\
+Optimiser state, FP32         & 13.0\,GB\\
+\midrule
+Total before activations      & 32.1\,GB\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\caution{These quantities are independent of batch size, so reducing the batch
+does not bring training within a 24\,GB device. Inference requires only 5.9\,GB
+in BF16 and is unaffected. Two devices with ZeRO-2 shard the gradients and
+optimiser state and are the configuration under which the reference run was
+measured.}
+
+\subsection{Procedure}
+
+\begin{lstlisting}[style=sh]
+# 1. Python environment. The project requires Python 3.10 exactly; the
+#    dataclass definitions do not parse under 3.11 or later.
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+
+# 2. Isaac-GR00T, ROBOTIS fork
+git clone https://github.com/ROBOTIS-GIT/Isaac-GR00T-n1.7.git Isaac-GR00T
+cd Isaac-GR00T && git checkout e81d02b
+uv sync --frozen
+
+# 3. Required patches. Neither is present in a fresh clone.
+git apply <hg-dagger>/configs/crop_to_square.patch
+git apply <hg-dagger>/configs/mixture_ratio.patch
+
+# 4. Modality configuration
+cp <hg-dagger>/configs/ffw_sg2_rev1_16d_config.py \
+   examples/CYCLO/ffw_sg2_rev1/
+
+# 5. Hugging Face authentication. The backbone is a gated repository, and
+#    the token must be present in the training environment, not only in the
+#    login shell: torchrun spawns child processes that do not inherit it.
+export HF_TOKEN=<token>
+uv run huggingface-cli login --token $HF_TOKEN
+\end{lstlisting}
+
+\caution{The two patches are required and are verified by the launcher before
+training begins. Without \texttt{crop\_to\_square.patch} every camera is
+letterboxed, which differs from the configuration the base checkpoint was
+trained under. Without \texttt{mixture\_ratio.patch} the \texttt{path@ratio}
+syntax is not parsed, all datasets are collapsed into one specification, and the
+mixture ratios are silently ignored.}
+
+\subsection{Base checkpoint}
+
+\begin{lstlisting}[style=sh]
+huggingface-cli download dawity/groot_screwing35 \
+    --include "16d_30k/checkpoint-30000/*" --local-dir runs/
+\end{lstlisting}
+
+The checkpoint is approximately 6.5\,GB and contains weights only.
 
 % =====================================================================
 \newpage
@@ -787,6 +888,63 @@ sub-tasks in which they occurred.
 % =====================================================================
 \newpage
 \section{Training}
+\label{sec:train}
+
+\subsection{Procedure}
+
+The sequence below takes a converted session through to a selected checkpoint.
+Paths are written relative to the training root.
+
+\begin{lstlisting}[style=sh]
+# 1. Validate the converted dataset. Refuses on a degenerate normaliser.
+python3 scripts/verify_dataset.py --root datasets/<session> --isaac
+
+# 2. If the export lacks the intervention column, repair it first.
+#    Idempotent; backs up whatever it replaces.
+python3 scripts/fix_dagger_dataset.py \
+    --root datasets/<session> \
+    --reference datasets/screwing35_follower_val
+
+# 3. Inspect the partition before writing it.
+python3 configs/export_dagger_split.py \
+    --src datasets/<session> --out-dir datasets/ --dry-run
+
+# 4. Write the partition. Each intervention becomes its own episode and the
+#    video is cut by frame index.
+python3 configs/export_dagger_split.py \
+    --src datasets/<session> --out-dir datasets/
+
+# 5. Validate both outputs. Video was re-encoded, so the alignment check
+#    is the one that matters here.
+python3 scripts/verify_dataset.py --root datasets/dagger_human --isaac
+python3 scripts/verify_dataset.py --root datasets/dagger_auto  --isaac
+
+# 6. Train.
+ROOT=$PWD \
+BASE=$PWD/runs/16d_30k/checkpoint-30000 \
+ORIG=$PWD/datasets/screwing35_follower_train \
+HUMAN=$PWD/datasets/dagger_human \
+AUTO=$PWD/datasets/dagger_auto \
+GR=$PWD/Isaac-GR00T \
+NUM_GPUS=2 STEPS=6000 \
+bash configs/06_train_dagger.sh
+
+# 7. Select a checkpoint by held-out error, not by training loss.
+python3 scripts/checkpoint_sweep.py \
+    --runs runs/groot_dagger_it1 \
+    --dataset datasets/screwing35_follower_val \
+    --v30     datasets/screwing35_follower_val
+\end{lstlisting}
+
+\caution{Step 6 prints a mixture line at start-up. It must list three
+specifications at the intended ratios. A single specification indicates that
+\texttt{mixture\_ratio.patch} was not applied and that the datasets are being
+weighted by size.}
+
+The launcher verifies both patches, all three datasets, available disk and
+device memory before starting, then executes a twenty-step smoke test. Disk is
+the usual constraint: a checkpoint is approximately 7\,GB, and saving every 250
+steps over 6{,}000 steps produces 24 of them.
 
 \subsection{Dataset partition}
 
@@ -879,7 +1037,115 @@ checkpoint indicated.}{6.5cm}
 
 % =====================================================================
 \newpage
+\section{Deployment}
+\label{sec:deploy}
+
+\subsection{Transferring the checkpoint}
+
+Checkpoints are published to Hugging Face rather than copied between machines.
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Repository} & \textbf{Contents}\\
+\midrule
+\texttt{dawity/groot\_screwing35}  & Base checkpoints, including the 16-dimension 30k model\\
+\texttt{dawity/groot\_dagger\_it1} & Checkpoints from the first HG-DAgger continuation\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[style=sh]
+huggingface-cli download dawity/groot_dagger_it1 \
+    --include "checkpoint-6000/*" --local-dir /workspace/model/groot/
+\end{lstlisting}
+
+A checkpoint comprises fifteen files. A directory containing fewer than fifteen
+is an incomplete transfer and will fail to load; the file count should be
+confirmed before deployment.
+
+\subsection{Configuration that must match training}
+
+\caution{The following are properties of the checkpoint, not of the deployment,
+and a mismatch produces degraded behaviour rather than an error.}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Property} & \textbf{Value} & \textbf{Consequence of mismatch}\\
+\midrule
+Declared dimensions & 16, both arms      & Input is scaled incorrectly\\
+Cameras             & 3 of the 4 recorded & An unseen view is supplied\\
+Crop                & Per-camera, \texttt{roi\_hybrid.json} & Framing differs from training\\
+\texttt{crop\_fraction} & 1.0            & Random cropping is reintroduced\\
+\texttt{use\_percentiles} & false        & Normalisation differs\\
+Action horizon      & 40                 & Chunk length differs\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last two are read from the checkpoint's own configuration and are already
+correct in the published checkpoints. The camera selection and crop are
+deployment-side settings and must be set to match.
+
+\subsection{Bringing the policy up}
+
+\begin{enumerate}
+\item Start the follower, the leader and the bridge as in Section~\ref{sec:loop}.
+\item Set the policy path in the operator interface to the downloaded
+      checkpoint directory.
+\item Load the policy. The phase indicator moves from ready through loading to
+      inferencing.
+\item Confirm that commands are enabled before expecting motion. The interface
+      distinguishes a loaded policy from one that is driving the arms.
+\end{enumerate}
+
+\subsection{Control parameters}
+
+The deployed controller applies smoothing and rate limiting on top of the
+policy's output.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Function}\\
+\midrule
+Chunk length        & 50 & Actions produced per inference\\
+Executed            & 25 & Actions executed before replanning\\
+Blend               & 20 & Cubic overlap between successive chunks\\
+Smoothing window    & 9  & Savitzky--Golay window\\
+Velocity clamp      & 0.6\,rad/s & Limit against the previous command\\
+Acceleration clamp  & 2.0\,rad/s\textsuperscript{2} & Limit on commanded acceleration\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\remark{The acceleration clamp, rather than the smoothing filter, is what
+removes jerk. The raw action chunk is approximately six times more aggressive
+than the human demonstrations. The blend length must remain shorter than the
+number of executed actions; if it is not, a new plan never takes effect before
+the next one arrives.}
+
+\subsection{Evaluation on hardware}
+
+\caution{Offline metrics do not establish robot behaviour. Held-out evaluation
+measures agreement with the original demonstrations, and a correction is by
+definition a departure from them, so a policy that has learned the corrections
+may score worse. Hardware execution is the only measurement that distinguishes
+the two cases.}
+
+Where a task fails on hardware, the first measurement to take is whether the arm
+reaches the position the policy commanded. A trace of commanded against achieved
+position separates a policy error from a control or mechanical one. Additional
+training data cannot correct the latter.
+
+% =====================================================================
+\newpage
 \section{Verification}
+\label{sec:verify}
 
 \subsection{Dataset validation}
 
