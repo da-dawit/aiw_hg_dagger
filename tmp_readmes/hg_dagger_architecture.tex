@@ -253,11 +253,11 @@
   \scriptsize\textbf{intervention} \ \textbf{reward} \ \textbf{done} \ \textbf{sample\_weight}};
 
 \node[bad,text width=56mm] (v21) at (26.0,4.4)
- {\texttt{LeRobot v2.1} --- \textbf{what Isaac-GR00T requires}\\[1mm]
+ {\texttt{LeRobot v2.1} as written by \texttt{to\_lerobot\_v21.py}\\\scriptsize the format Isaac-GR00T requires\\[1mm]
   \scriptsize index $\cdot$ episode\_index $\cdot$ task\_index $\cdot$ timestamp\\
   \scriptsize observation.state $\cdot$ action $\cdot$ subtask\_index\\[1mm]
-  \scriptsize\textcolor{eHuman}{\textbf{no intervention $\cdot$ no reward}}\\
-  \scriptsize\textcolor{eHuman}{\textbf{no done $\cdot$ no sample\_weight}}};
+  \scriptsize\textcolor{eHuman}{\textbf{intervention, reward, done,}}\\
+  \scriptsize\textcolor{eHuman}{\textbf{sample\_weight not emitted}}};
 
 \draw[ed] (conv.east) -- ++(1.6,0) |- node[lbl,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
 \draw[ed] (conv.east) -- ++(1.6,0) |- node[lbl,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);

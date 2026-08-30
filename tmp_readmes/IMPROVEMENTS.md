@@ -18,6 +18,12 @@ does not.** Isaac-GR00T requires v2.1. So every dataset exported for GR00T train
 loses the human/policy label, and with it the entire distinction between HG-DAgger and ordinary
 behaviour cloning.
 
+**This is the writer, not the format.** LeRobot v2.1 places no restriction on extra columns, and
+`to_lerobot_v21.py` already emits one that stock LeRobot does not define -- `subtask_index`,
+declared in `meta/info.json` and carried in the parquet without trouble. The four online-RL
+columns go in the same way, in the same function, a few lines from the block that already does
+it. There is nothing to work around.
+
 ---
 
 ## 1. Proof, in four facts

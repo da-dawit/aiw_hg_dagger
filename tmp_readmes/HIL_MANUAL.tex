@@ -551,10 +551,10 @@ Light solid          & Status, feedback and control plane\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
   \scriptsize \textbf{intervention, reward, done, sample\_weight}};
 \node[proc,fill=figFlag,text width=54mm,line width=1.2pt] (v21) at (26.0,4.6)
- {\textbf{LeRobot v2.1} --- required by Isaac-GR00T\\[0.6mm]
+ {\textbf{LeRobot v2.1} as written by \texttt{to\_lerobot\_v21.py}\\\scriptsize (the format Isaac-GR00T requires)\\[0.6mm]
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
-  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done and sample\_weight absent}}};
+  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done, sample\_weight}}\\\scriptsize \textcolor{figHuman}{\textbf{not emitted by this writer}}};
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
 
@@ -889,9 +889,16 @@ Every dataset exported for GR00T training therefore omits the operator/policy
 label, and the correction frames become indistinguishable from the policy's own
 behaviour.}
 
-The remedy is to mirror the v3.0 schema block in the v2.1 writer. The flags are
-already computed and attached to the episode structure; no additional
-computation or parameter passing is required.
+\remark{This is a property of the writer, not of the format. LeRobot v2.1 places
+no restriction on additional columns, and \texttt{to\_lerobot\_v21.py} already
+emits one: \texttt{subtask\_index} is not part of stock LeRobot, is declared in
+\texttt{meta/info.json}, and is carried in the parquet files without difficulty.
+The four online-RL columns are added the same way, in the same function.}
+
+The remedy is to mirror the v3.0 schema block in the v2.1 writer, alongside the
+existing \texttt{subtask\_index} block that already demonstrates the pattern.
+The flags are computed and attached to the episode structure regardless of
+output format; no additional computation or parameter passing is required.
 
 \begin{lstlisting}[style=py,caption={Schema addition required in \texttt{to\_lerobot\_v21.py}}]
 has_hil_feature = any(ep.intervention_flags for ep in episodes)
