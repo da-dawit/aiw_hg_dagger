@@ -240,13 +240,10 @@ without watching the screen.
   `follower[t+5]` to 0.159° across all frames, 0.10% freeze frames).
 - **`_assign_intervention_flags`'s causal fill.** Correct as written. (Its *handoff exclusion* is
   the subject of Defect 2 above --- the causal fill itself is fine.)
-- **The gripper holding its teleoped value on disengage.** This was a deliberate fix by the
-  operator: originally the gripper did not retain its value after freezing, and now it does. The
-  implementing code is in the **`cyclo_teleoperation` package, which is not in this repository**
-  (`ffw_bringup/package.xml` lists it only as `<exec_depend>`), so it is documented here from the
-  operator's account rather than read from source. Note this is a *different* mechanism from
-  `robot_client.py`'s `GRIPPER_HOLD_EFFORT_THRESHOLD`, which freezes the *policy's* commanded
-  gripper on measured effort and defaults to `0.0` (disabled).
+- **The gripper holds its teleoped value on disengage.** An operator fix — it did not retain
+  the value originally. Implemented in `cyclo_teleoperation` (external to this repo, so not
+  read from source here). Distinct from `robot_client.py`'s `GRIPPER_HOLD_EFFORT_THRESHOLD`,
+  which freezes the *policy's* commanded gripper on measured effort and defaults to `0.0`.
 - **`record_triggers_enabled: false`.** The tact press both engages a leader arm and fires a
   record trigger; during INFERENCING that engages an arm onto a topic the policy is driving.
   Leaving it disabled is right.
