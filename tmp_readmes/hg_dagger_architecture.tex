@@ -144,11 +144,11 @@
 \draw[auto]  (policy.west) -- node[lbl,above,pos=0.5]{\textbf{T6} policy} (fctrl.east);
 
 \node[note,text width=76mm,anchor=north west] at (11.8,-0.9)
- {\textbf{T6 is ONE topic, written by BOTH sides.}
-  \texttt{/leader/joint\_trajectory\_command\_broadcaster\_\{left,right\}/joint\_trajectory}.
-  Teleop node and policy publish to the same place, so the recorded \texttt{action} is
-  correct in \emph{either} mode --- there is no stale-leader pose. \textbf{T14}
-  (\texttt{/task/policy\_active}, latched) is what stops them contending.};
+ {\textbf{T6 is ONE topic, written by BOTH sides}\\
+  \texttt{\scriptsize /leader/joint\_trajectory\_command\_}\\
+  \texttt{\scriptsize broadcaster\_\{left,right\}/joint\_trajectory}\\[0.8mm]
+  Teleop node and policy publish to the same place, so \texttt{action} is valid in either
+  mode --- no stale-leader pose. \textbf{T14} stops them contending.};
 
 % ---------- follower feedback ----------
 \draw[ed] (fhw)   -- (fctrl);
@@ -166,8 +166,8 @@
 \draw[ed] (rb.north east) -- ++(2.0,3.2) -| node[lbl,pos=0.2,left]{T8} (policy.south west);
 
 \node[note,text width=56mm,anchor=north west] at (21.6,-0.9)
- {\textbf{T18 Home} publishes straight from the browser into \texttt{ai\_worker}
-  over rosbridge, bypassing the orchestrator --- the only UI action that does.};
+ {\textbf{T18 Home} goes straight from the browser to \texttt{ai\_worker}
+  over rosbridge --- the only UI action that skips the orchestrator.};
 
 \node[proc,text width=84mm,align=left,anchor=north west] at (0.2,-0.9)
  {\textbf{The operator's takeover loop}\\[0.5mm]
@@ -280,38 +280,39 @@
 {\LARGE\bfseries Topic / Service Legend}\\[1mm]
 {\small Verified against \texttt{cyclo\_intelligence\_backup@main} and \texttt{aiw\_backup@feature-a2}, 2026-08-30.}\\[3mm]
 
-\begin{longtable}{p{7mm}p{19mm}p{60mm}p{42mm}p{100mm}}
+{\renewcommand{\arraystretch}{1.35}
+\begin{longtable}{p{9mm}p{24mm}p{76mm}p{50mm}p{196mm}}
 \hline
 \textbf{ID} & \textbf{Kind} & \textbf{Name} & \textbf{Type} & \textbf{Meaning / gotcha}\\
 \hline
 \endhead
-T1 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/joystick\_controller/tact\_trigger} & \texttt{\scriptsize std\_msgs/String} & \scriptsize "left"/"right" tap. \textbf{Record trigger disabled} (\texttt{record\_triggers\_enabled: false}): one press both engages that leader arm and fires a record trigger, and engaging an arm during INFERENCING puts the leader onto T6 against the policy.\\
-T2 & \scriptsize PUB/SUB & \texttt{\scriptsize .../joystick\_command} & \texttt{\scriptsize robotis\_interfaces/\allowbreak TeleoperationCommand} & \scriptsize ENABLE / DISABLE / TOGGLE, per arm.\\
-T3 & \scriptsize PUB/SUB & \texttt{\scriptsize .../raw\_joint\_trajectory} & \texttt{\scriptsize trajectory\_msgs/\allowbreak JointTrajectory} & \scriptsize The leader's own arm command, before mode handling.\\
-T4 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/teleoperation/control\_status} & \texttt{\scriptsize robotis\_interfaces/\allowbreak ControlModeStatus} & \scriptsize \texttt{active\_arms} + mode. \textbf{Not recorded} --- \texttt{robotis\_interfaces} is absent where \texttt{service\_bag\_recorder} runs, and adding it killed the whole launch group after every takeover. Record T5 instead.\\
-T5 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /leader/teleoperation/active\_arms\_str} & \texttt{\scriptsize std\_msgs/String} & \scriptsize Plain-string translation of T4 from \texttt{leader\_bridge.py}; loadable everywhere. The UI badge reads it. \textbf{The bag should too} --- see IMPROVEMENTS \S3.4.\\
-T6 & \scriptsize PUB/SUB & \texttt{\scriptsize /leader/joint\_trajectory\_command\_\allowbreak broadcaster\_\{left,right\}/joint\_trajectory} & \texttt{\scriptsize trajectory\_msgs/\allowbreak JointTrajectory} & \scriptsize \textbf{Written by BOTH the teleop node and the policy.} This is why \texttt{action} is valid in either mode. Contention is prevented by T14, not by using separate topics.\\
-T7 & \scriptsize PUB/SUB & \texttt{\scriptsize /joint\_states}, \texttt{/odom}, 4 camera topics & \texttt{\scriptsize JointState, Odometry,\allowbreak CompressedImage} & \scriptsize Follower feedback and vision. 4 cameras are recorded; the policy's modality config declares 3.\\
-T8 & \scriptsize PUB/SUB & \texttt{\scriptsize /<backend>/engine\_command} & \texttt{\scriptsize std\_msgs/String} & \scriptsize Orchestrator $\to$ \texttt{groot\_server}: load / unload / run.\\
-T9 & \scriptsize SERVICE & \texttt{\scriptsize /task/command} & \texttt{\scriptsize SendCommand.srv} & \scriptsize Start / Pause / Resume / Clear policy; Start / Stop / Cancel recording.\\
-T10 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/inference\_status} & \texttt{\scriptsize interfaces/InferenceStatus} & \scriptsize \texttt{inference\_phase}: READY 0, LOADING 1, INFERENCING 2, PAUSED 3. \textbf{Published on transitions only}, so the converter must forward-fill. Sole source of the intervention label.\\
-T11 & \scriptsize SERVICE & \texttt{\scriptsize /data/recording} & \texttt{\scriptsize RecordingCommand.srv} & \scriptsize Recording lifecycle, orchestrator $\to$ \texttt{cyclo\_data\_node}.\\
-T13 & \scriptsize SERVICE & \texttt{\scriptsize /data/convert}, \texttt{\scriptsize /data/convert/status} & \texttt{\scriptsize StartConversion.srv,\allowbreak GetConversionStatus.srv} & \scriptsize LeRobot conversion. \texttt{convert\_v21} and \texttt{convert\_v30} both false means "run both".\\
-T14 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/policy\_active} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize Mirrors T10's INFERENCING into \texttt{ai\_worker}. Gates the leader chain off T6 so leader and policy never publish together.\\
-T15 & \scriptsize PUB/SUB & \texttt{\scriptsize .../sensorxel\_joy\_values} & \texttt{\scriptsize std\_msgs/\allowbreak Float64MultiArray} & \scriptsize Raw joystick axes; \texttt{leader\_bridge.py} watches them for the drag-hold gesture.\\
-T16 & \scriptsize PUB/SUB & \texttt{\scriptsize .../toggle\_pause\_request} & \texttt{\scriptsize std\_msgs/Empty} & \scriptsize Fires once on a $\geq$1.0\,s drag-hold. Lets the operator pause/resume the policy without the browser.\\
-T17 & \scriptsize PUB/SUB & \texttt{\scriptsize .../control\_command} & \texttt{\scriptsize robotis\_interfaces/\allowbreak ControlModeCommand} & \scriptsize Mode 1 absolute MoveJ, mode 2 relative delta. SG2 runs mode 2.\\
-T18 & \scriptsize PUB/SUB \emph{latched} & \texttt{\scriptsize /task/home\_in\_progress} & \texttt{\scriptsize std\_msgs/Bool} & \scriptsize One-shot Home trajectory. \textbf{Published straight from the browser}, bypassing the orchestrator --- the only UI action that does.\\
-T19 & \scriptsize SERVICE & \texttt{\scriptsize /task/command} (UPDATE\_INSTRUCTION) & \texttt{\scriptsize SendCommand.srv} & \scriptsize "Update Task Instruction". Appends to \texttt{instruction\_change\_log}, which splits the episode into correctly-timed sub-segments. Without it a continuous take yields one segment and every frame carries whatever instruction was set last.\\
+T1 & \small PUB/SUB & \texttt{\small /leader/joystick\_controller/\allowbreak tact\_trigger} & \texttt{\small std\_msgs/String} & \small Tap emits "left"/"right". \textbf{Record trigger disabled} --- one press also engages that arm, which during INFERENCING would put the leader onto T6 against the policy.\\
+T2 & \small PUB/SUB & \texttt{\small .../joystick\_command} & \texttt{\small robotis\_interfaces/\allowbreak TeleoperationCommand} & \small ENABLE / DISABLE / \textbf{TOGGLE}, per arm. The tact sends TOGGLE --- engage and stop are the same press.\\
+T3 & \small PUB/SUB & \texttt{\small .../raw\_joint\_trajectory} & \texttt{\small trajectory\_msgs/\allowbreak JointTrajectory} & \small The leader's own arm command, before mode handling.\\
+T4 & \small PUB/SUB & \texttt{\small /leader/teleoperation/\allowbreak control\_status} & \texttt{\small robotis\_interfaces/\allowbreak ControlModeStatus} & \small \texttt{active\_arms} + mode. \textbf{Not recorded}: \texttt{robotis\_interfaces} is absent in the recorder, and adding it killed the launch group. Use T5.\\
+T5 & \small PUB/SUB \emph{latched} & \texttt{\small /leader/teleoperation/\allowbreak active\_arms\_str} & \texttt{\small std\_msgs/String} & \small Same information as T4 as a plain string, from \texttt{leader\_bridge.py}. The UI badge reads it; \textbf{the bag should too}.\\
+T6 & \small PUB/SUB & \texttt{\small /leader/joint\_trajectory\_command\_\allowbreak broadcaster\_\{left,right\}/\allowbreak joint\_trajectory} & \texttt{\small trajectory\_msgs/\allowbreak JointTrajectory} & \small \textbf{Written by BOTH the teleop node and the policy.} That is why \texttt{action} is valid in either mode. T14 prevents contention, not separate topics.\\
+T7 & \small PUB/SUB & \texttt{\small /joint\_states}, \texttt{\small /odom}, 4 camera topics & \texttt{\small JointState, Odometry,\allowbreak CompressedImage} & \small Follower feedback and vision. 4 cameras recorded, 3 declared to the policy.\\
+T8 & \small PUB/SUB & \texttt{\small /<backend>/engine\_command} & \texttt{\small std\_msgs/String} & \small Orchestrator $\to$ \texttt{groot\_server}: load / unload / run.\\
+T9 & \small SERVICE & \texttt{\small /task/command} & \texttt{\small SendCommand.srv} & \small Start / Pause / Resume / Clear policy; Start / Stop / Cancel recording.\\
+T10 & \small PUB/SUB \emph{latched} & \texttt{\small /task/inference\_status} & \texttt{\small interfaces/\allowbreak InferenceStatus} & \small \texttt{inference\_phase}: READY 0, LOADING 1, INFERENCING 2, PAUSED 3. \textbf{Transitions only} --- the converter forward-fills. Sole source of the intervention label.\\
+T11 & \small SERVICE & \texttt{\small /data/recording} & \texttt{\small RecordingCommand.srv} & \small Recording lifecycle, orchestrator $\to$ \texttt{cyclo\_data\_node}.\\
+T13 & \small SERVICE & \texttt{\small /data/convert}, \texttt{\small /data/convert/status} & \texttt{\small StartConversion.srv,\allowbreak GetConversionStatus.srv} & \small LeRobot conversion. Both \texttt{convert\_v21} and \texttt{convert\_v30} false means "run both".\\
+T14 & \small PUB/SUB \emph{latched} & \texttt{\small /task/policy\_active} & \texttt{\small std\_msgs/Bool} & \small Mirrors T10's INFERENCING into \texttt{ai\_worker}. Gates the leader chain off T6 so the two never publish together.\\
+T15 & \small PUB/SUB & \texttt{\small .../sensorxel\_joy\_values} & \texttt{\small std\_msgs/\allowbreak Float64MultiArray} & \small Raw joystick axes. The gesture detector watches these.\\
+T16 & \small PUB/SUB & \texttt{\small /leader/teleoperation/\allowbreak toggle\_pause\_request} & \texttt{\small std\_msgs/Empty} & \small Fires once on a $\geq$1\,s drag-hold. \textbf{One topic, two meanings}: pause if INFERENCING, resume if PAUSED. Lets the operator work without the browser.\\
+T17 & \small PUB/SUB & \texttt{\small .../control\_command} & \texttt{\small robotis\_interfaces/\allowbreak ControlModeCommand} & \small Mode 1 absolute MoveJ, mode 2 relative delta. \textbf{SG2 default is mode 2.}\\
+T18 & \small PUB/SUB \emph{latched} & \texttt{\small /task/home\_in\_progress} & \texttt{\small std\_msgs/Bool} & \small One-shot Home trajectory, published \textbf{straight from the browser} --- the only UI action that skips the orchestrator.\\
+T19 & \small SERVICE & \texttt{\small /task/command}\ (UPDATE\_INSTRUCTION) & \texttt{\small SendCommand.srv} & \small Appends to \texttt{instruction\_change\_log}, which splits the episode into correctly-timed sub-segments. Without it a continuous take gets one segment and every frame carries the last instruction set.\\
 \hline
-\end{longtable}
+\end{longtable}}
 
 \vspace{2mm}
 {\large\bfseries Derived dataset columns}\\[2mm]
 \begin{itemize}[leftmargin=6mm,itemsep=1.2mm]
 \item \textbf{\texttt{observation.state}} (22) and \textbf{\texttt{action}} (20) --- they differ: state carries \texttt{head\_joint1/2}, action does not. Slice order follows YAML insertion order. The policy declares only the first 16 (both arms); the remainder are recorded but not trained on.
 \item \textbf{\texttt{task\_index} / \texttt{subtask\_index}} --- per frame, from \texttt{episode\_info.json}'s \texttt{segments}, split by \texttt{instruction\_change\_log} (T19). The episode's top-level \texttt{task\_instruction} is a separate stable field; it is \emph{not} the live per-phase instruction, which is overwritten on every T19 click.
-\item \textbf{\texttt{intervention}} --- \textbf{1 = human drove, 0 = policy drove, $-1$ = excluded} (handoff, leader slow-start, nobody driving, phase never observed). This is the \emph{inverse} of \texttt{task\_is\_policy}, the name some downstream tooling expects; getting the polarity wrong raises nothing and trains on exactly the wrong frames. \textbf{v3.0 only.}
+\item \textbf{\texttt{intervention}} --- \textbf{1 = human drove, 0 = policy drove, $-1$ = excluded} (handoff, nobody driving, phase never observed --- note the handoff rule assumes a mode-1 sweep, see \texttt{IMPROVEMENTS.md} Defect 2). This is the \emph{inverse} of \texttt{task\_is\_policy}, the name some downstream tooling expects; getting the polarity wrong raises nothing and trains on exactly the wrong frames. \textbf{v3.0 only.}
 \item \textbf{\texttt{reward}, \texttt{done}, \texttt{sample\_weight}} --- emitted alongside \texttt{intervention}. \textbf{v3.0 only}, so HIL-SERL-style training is also impossible from a v2.1 export.
 \end{itemize}
 
