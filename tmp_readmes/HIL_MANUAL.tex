@@ -3,7 +3,9 @@
 %  System Manual
 %
 %  Compile: pdflatex (twice, for cross-references), or upload to Overleaf.
-%  Monochrome throughout; no colour dependencies.
+%  Colour policy: body text, tables and callouts are monochrome and print
+%  correctly in greyscale. Colour is used only in the architecture figures
+%  and in code listings, where it carries information rather than decoration.
 %
 %  Figure placeholders use \placeholder{file}{description}{height}.
 %  Replace with \includegraphics when the image is available.
@@ -27,10 +29,26 @@
 \usepackage{array}
 \usepackage{enumitem}
 \usepackage{listings}
+\usepackage{xcolor}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage[hidelinks]{hyperref}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc}
+
+% ---------------- palette (figures and listings only) ----------------
+% Deliberately not used in body text or tables, which remain monochrome.
+\definecolor{figHuman}{RGB}{170,45,45}     % human commands the arms
+\definecolor{figAuto}{RGB}{30,95,175}      % policy commands the arms
+\definecolor{figWorker}{RGB}{228,240,252}
+\definecolor{figPolicy}{RGB}{235,229,250}
+\definecolor{figCyclo}{RGB}{253,240,222}
+\definecolor{figUI}{RGB}{229,247,232}
+\definecolor{figStore}{RGB}{240,240,240}
+\definecolor{figFlag}{RGB}{253,228,228}
+\definecolor{lstKey}{RGB}{20,80,160}
+\definecolor{lstCom}{RGB}{100,120,100}
+\definecolor{lstStr}{RGB}{150,60,20}
+\definecolor{lstBg}{RGB}{249,249,249}
 
 % ---------------- typography ----------------
 \linespread{1.04}
@@ -51,7 +69,10 @@
 % ---------------- listings ----------------
 \lstset{
   basicstyle=\ttfamily\footnotesize,
-  commentstyle=\ttfamily\footnotesize\itshape,
+  keywordstyle=\color{lstKey}\bfseries,
+  commentstyle=\color{lstCom}\itshape,
+  stringstyle=\color{lstStr},
+  backgroundcolor=\color{lstBg},
   breaklines=true,
   showstringspaces=false,
   frame=single,
@@ -62,6 +83,12 @@
   captionpos=b,
   abovecaptionskip=4pt,
 }
+\lstdefinestyle{sh}{language=bash}
+\lstdefinestyle{py}{language=Python}
+\lstdefinestyle{yml}{
+  morekeywords={observation,images,state,action,recording,extra_topics,topic,
+                rotation_deg,upper_body,mobile,arm_left,arm_right,head,lift},
+  morecomment=[l]{\#}}
 
 % ---------------- callouts (ruled, unfilled) ----------------
 \newcommand{\callout}[2]{%
@@ -168,6 +195,115 @@ visible.}{5cm}
 
 % =====================================================================
 \newpage
+\section{Obtaining the software}
+\label{sec:obtain}
+
+\subsection{Repositories}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Repository} & \textbf{Branch} & \textbf{Contents}\\
+\midrule
+\texttt{da-dawit/aiw\_backup}                & \texttt{feature-a2} & Robot-side packages; this manual\\
+\texttt{da-dawit/cyclo\_intelligence\_backup} & \texttt{main}       & Orchestration, recording, conversion\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both are private. Access is by SSH key.
+
+\begin{lstlisting}[style=sh]
+git clone git@github.com:da-dawit/aiw_backup.git
+git clone git@github.com:da-dawit/cyclo_intelligence_backup.git
+\end{lstlisting}
+
+\subsection{Branch selection}
+
+\texttt{aiw\_backup} carries two branches. The default is
+\texttt{ai\_worker-wip}; the work described in this manual is on
+\texttt{feature-a2}, which is thirteen commits ahead of it. A plain clone
+therefore checks out the wrong branch.
+
+\begin{lstlisting}[style=sh]
+cd aiw_backup
+git checkout feature-a2
+\end{lstlisting}
+
+\caution{A branch named \texttt{feature-a2} may already exist in a working copy
+obtained from a different source. The name does not imply the same history. If a
+local \texttt{feature-a2} is already present, do not assume it corresponds to
+the branch described here; follow Section~\ref{sec:existing}.}
+
+\subsection{Working copies that already contain a \texttt{feature-a2}}
+\label{sec:existing}
+
+Add this repository as an additional remote rather than overwriting the existing
+branch. Nothing is lost and the two histories can be compared directly.
+
+\begin{lstlisting}[style=sh]
+cd <existing working copy>
+git remote add backup git@github.com:da-dawit/aiw_backup.git
+git fetch backup
+
+# What does this branch contain that the local one does not?
+git log --oneline feature-a2..backup/feature-a2
+
+# Documentation differences only
+git diff --stat feature-a2 backup/feature-a2 -- tmp_readmes/
+\end{lstlisting}
+
+Check out the fetched branch under a distinct name, leaving the existing branch
+untouched:
+
+\begin{lstlisting}[style=sh]
+git checkout -b feature-a2-backup backup/feature-a2
+\end{lstlisting}
+
+\subsection{Verifying the working copy}
+
+\begin{lstlisting}[style=sh]
+git log --oneline -1                 # expect a tmp_readmes commit at the tip
+ls tmp_readmes/
+# HIL_MANUAL.tex  IMPROVEMENTS.md  OPERATING_MANUAL.md
+# hg_dagger_architecture.tex  hg_dagger_architecture.pdf
+\end{lstlisting}
+
+The \texttt{ai\_worker-wip} branch also contains a \texttt{tmp\_readmes}
+directory, but with a different and older set of files. The presence of the
+directory is therefore not sufficient evidence of the correct branch; the file
+list is.
+
+\subsection{Documentation directory is excluded from version control}
+
+\caution{\texttt{tmp\_readmes/} appears in \texttt{.gitignore}. The files listed
+above are tracked because they were added with \texttt{git add -f}; a file newly
+created in that directory will not appear in \texttt{git status} and will not be
+committed by \texttt{git add .} or \texttt{git commit -a}. New documentation
+must be staged explicitly:}
+
+\begin{lstlisting}[style=sh]
+git add -f tmp_readmes/<new file>
+\end{lstlisting}
+
+\subsection{Building this manual}
+
+The source is \texttt{tmp\_readmes/HIL\_MANUAL.tex}. It requires no packages
+beyond a standard TeX Live installation and compiles unmodified on Overleaf.
+Two passes are required for cross-references.
+
+\begin{lstlisting}[style=sh]
+pdflatex HIL_MANUAL.tex
+pdflatex HIL_MANUAL.tex
+\end{lstlisting}
+
+Figure placeholders are listed in Appendix~C. Each is a dashed frame naming the
+file it expects; replace the \texttt{\textbackslash placeholder} call with
+\texttt{\textbackslash includegraphics} once the image exists.
+
+% =====================================================================
+\newpage
 \section{Architecture}
 
 Figures~1 and~2 present the runtime control path and the data path
@@ -180,9 +316,9 @@ Section~\ref{sec:legend}.
 \toprule
 \textbf{Line} & \textbf{Meaning}\\
 \midrule
-Heavy solid   & Human commands the arms\\
-Heavy dashed  & Policy commands the arms\\
-Light solid   & Status, feedback and control plane\\
+Heavy solid (red)    & Human commands the arms\\
+Heavy dashed (blue)  & Policy commands the arms\\
+Light solid          & Status, feedback and control plane\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -201,8 +337,8 @@ Light solid   & Status, feedback and control plane\\
   hw/.style={draw,dashed,align=center,font=\small,minimum height=8mm,inner sep=3pt},
   cont/.style={draw,inner sep=5mm,line width=0.4pt},
   ed/.style={-{Stealth[length=2mm]},line width=0.4pt},
-  hu/.style={-{Stealth[length=2mm]},line width=1.3pt},
-  au/.style={-{Stealth[length=2mm]},line width=1.3pt,dashed},
+  hu/.style={-{Stealth[length=2mm]},line width=1.3pt,draw=figHuman},
+  au/.style={-{Stealth[length=2mm]},line width=1.3pt,dashed,draw=figAuto},
   lb/.style={font=\scriptsize,fill=white,inner sep=1pt},
   nt/.style={font=\scriptsize,align=left}]
 
@@ -215,7 +351,7 @@ Light solid   & Status, feedback and control plane\\
 \node[proc] (fc)  at (18.2,11.8){Follower \texttt{ros2\_control}\\\scriptsize arm\_l, arm\_r, head, lift,\\\scriptsize swerve\_drive, joint\_state\_broadcaster};
 \node[proc] (cam) at (18.2, 9.0){Cameras\\\scriptsize ZED head (L, R), two D405 wrist\\\scriptsize Four recorded, three supplied to the policy};
 \begin{scope}[on background layer]
-\node[cont,fit=(lhw)(joy)(bc)(br)(tel)(fhw)(fc)(cam),
+\node[cont,fill=figWorker,fit=(lhw)(joy)(bc)(br)(tel)(fhw)(fc)(cam),
  label={[font=\bfseries\small,anchor=north west]north west:\ \texttt{ai\_worker}}]{};
 \end{scope}
 
@@ -227,7 +363,7 @@ Light solid   & Status, feedback and control plane\\
   \scriptsize Sixteen dimensions, arms only\\
   \scriptsize Gripper hold on sustained measured effort};
 \begin{scope}[on background layer]
-\node[cont,fit=(pol),label={[font=\bfseries\small]north:\texttt{groot\_server}}]{};
+\node[cont,fill=figPolicy,fit=(pol),label={[font=\bfseries\small]north:\texttt{groot\_server}}]{};
 \end{scope}
 
 \node[proc] (orc) at ( 3.8,3.9){\texttt{orchestrator\_node}\\\scriptsize session and policy state machine};
@@ -235,7 +371,7 @@ Light solid   & Status, feedback and control plane\\
 \node[proc] (cd)  at ( 3.8,1.5){\texttt{cyclo\_data\_node}\\\scriptsize recording, conversion, dataset services};
 \node[proc] (sup) at (10.6,1.5){\texttt{supervisor\_api}\\\scriptsize port 7100};
 \begin{scope}[on background layer]
-\node[cont,fit=(orc)(rb)(cd)(sup),
+\node[cont,fill=figCyclo,fit=(orc)(rb)(cd)(sup),
  label={[font=\bfseries\small,anchor=south west]south west:\ \texttt{cyclo\_intelligence}}]{};
 \end{scope}
 
@@ -246,7 +382,7 @@ Light solid   & Status, feedback and control plane\\
   \scriptsize Correction-length counter\\
   \scriptsize Sub-task instruction control};
 \begin{scope}[on background layer]
-\node[cont,fit=(ui),label={[font=\bfseries\small]north:Browser}]{};
+\node[cont,fill=figUI,fit=(ui),label={[font=\bfseries\small]north:Browser}]{};
 \end{scope}
 
 \draw[ed] (lhw) -- (joy);
@@ -319,14 +455,14 @@ Light solid   & Status, feedback and control plane\\
   \scriptsize Each topic is both the policy's command target and the record target};
 \node[proc,text width=76mm,align=left] (ex) at (4.6,4.2)
  {\textbf{recording.extra\_topics}\\
-  \scriptsize \texttt{/task/inference\_status} --- source of the intervention label\\
+  \scriptsize \textcolor{figHuman}{\texttt{/task/inference\_status} --- source of the intervention label}\\
   \scriptsize \texttt{/tf}, four \texttt{camera\_info} topics};
 \begin{scope}[on background layer]
-\node[cont,fit=(obs)(st)(ac)(ex),
+\node[cont,fill=figWorker,fit=(obs)(st)(ac)(ex),
  label={[font=\bfseries\small,anchor=north west]north west:\ Recorded topics}]{};
 \end{scope}
 
-\node[proc,text width=44mm] (mc) at (16.4,10.6)
+\node[proc,fill=figStore,text width=44mm] (mc) at (16.4,10.6)
  {\texttt{/workspace/rosbag2/}\\\texttt{<task>/<episode>/*.mcap}\\\texttt{episode\_info.json}};
 \node[proc,text width=52mm] (cv) at (16.4,6.6)
  {\texttt{base\_converter.py}\\[0.6mm]
@@ -337,16 +473,16 @@ Light solid   & Status, feedback and control plane\\
 \draw[ed] (ex.east)  -- ++(1.6,0) |- (mc.west);
 \draw[ed] (mc) -- (cv);
 
-\node[proc,text width=54mm] (v30) at (26.0,9.2)
+\node[proc,fill=figStore,text width=54mm] (v30) at (26.0,9.2)
  {\textbf{LeRobot v3.0}\\[0.6mm]
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
   \scriptsize \textbf{intervention, reward, done, sample\_weight}};
-\node[proc,text width=54mm,line width=1.2pt] (v21) at (26.0,4.6)
+\node[proc,fill=figFlag,text width=54mm,line width=1.2pt] (v21) at (26.0,4.6)
  {\textbf{LeRobot v2.1} --- required by Isaac-GR00T\\[0.6mm]
   \scriptsize index, episode\_index, task\_index, timestamp,\\
   \scriptsize observation.state, action, subtask\_index\\[0.6mm]
-  \scriptsize \textbf{intervention, reward, done and sample\_weight absent}};
+  \scriptsize \textcolor{figHuman}{\textbf{intervention, reward, done and sample\_weight absent}}};
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,above]{\texttt{to\_lerobot\_v30.py}} (v30.west);
 \draw[ed] (cv.east) -- ++(1.6,0) |- node[lb,pos=0.32,below]{\texttt{to\_lerobot\_v21.py}} (v21.west);
 
@@ -369,7 +505,7 @@ Light solid   & Status, feedback and control plane\\
 The follower is started first, then the leader, then the bridge. The bridge
 subscribes to topics created by the preceding two.
 
-\begin{lstlisting}
+\begin{lstlisting}[style=sh]
 ros2 launch ffw_bringup ffw_sg2_follower_ai.launch.py
 ros2 launch ffw_bringup ffw_a2_leader_ai.launch.py
 python3 leader_bridge.py
@@ -445,7 +581,7 @@ The robot configuration file is the authoritative specification. Every topic
 referenced there is subscribed by the recorder, and the observation topics are
 additionally subscribed by the live inference path.
 
-\begin{lstlisting}[caption={\texttt{shared/robot\_configs/ffw\_sg2\_rev1\_config.yaml}, abridged}]
+\begin{lstlisting}[style=yml,caption={\texttt{shared/robot\_configs/ffw\_sg2\_rev1\_config.yaml}, abridged}]
 observation:
   images:
     cam_left_head:   {topic: /zed/zed_node/left/image_rect_color/compressed}
@@ -538,7 +674,7 @@ The remedy is to mirror the v3.0 schema block in the v2.1 writer. The flags are
 already computed and attached to the episode structure; no additional
 computation or parameter passing is required.
 
-\begin{lstlisting}[caption={Schema addition required in \texttt{to\_lerobot\_v21.py}}]
+\begin{lstlisting}[style=py,caption={Schema addition required in \texttt{to\_lerobot\_v21.py}}]
 has_hil_feature = any(ep.intervention_flags for ep in episodes)
 if has_hil_feature:
     schema_fields.append(pa.field("intervention",  pa.int64()))
@@ -589,7 +725,7 @@ intervention remains present in the joint trajectories.
       the recorded action.
 \end{enumerate}
 
-\begin{lstlisting}[caption={Stationary-interval detection}]
+\begin{lstlisting}[style=py,caption={Stationary-interval detection}]
 FPS = 30
 S = np.stack(df["observation.state"].to_numpy())[:, :16]
 v = np.linalg.norm(np.diff(S, axis=0), axis=1) * FPS * 180 / np.pi
@@ -747,7 +883,7 @@ checkpoint indicated.}{6.5cm}
 
 \subsection{Dataset validation}
 
-\begin{lstlisting}
+\begin{lstlisting}[style=sh]
 python3 verify_dataset.py --root <dataset> --isaac
 \end{lstlisting}
 
@@ -771,7 +907,7 @@ Video alignment       & Video and parquet disagreeing after re-encoding\\
 
 \subsection{Post-conversion assertion}
 
-\begin{lstlisting}
+\begin{lstlisting}[style=py]
 import pandas as pd, glob, json
 df = pd.concat([pd.read_parquet(f)
                 for f in glob.glob("<ds>/data/**/*.parquet", recursive=True)])
