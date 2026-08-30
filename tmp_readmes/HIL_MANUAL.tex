@@ -283,46 +283,20 @@ untouched:
 git checkout -b feature-a2-backup backup/feature-a2
 \end{lstlisting}
 
-\subsection{Verifying the working copy}
+\subsection{Confirming the working copy}
 
-\begin{lstlisting}[style=sh]
-git log --oneline -1                 # expect a tmp_readmes commit at the tip
-ls tmp_readmes/
-# HIL_MANUAL.tex  IMPROVEMENTS.md  OPERATING_MANUAL.md
-# hg_dagger_architecture.tex  hg_dagger_architecture.pdf
-\end{lstlisting}
+\texttt{ai\_worker-wip} also carries a \texttt{tmp\_readmes} directory, with an
+older set of files, so the directory's presence does not identify the branch.
+The file list does: \texttt{HIL\_MANUAL.tex}, \texttt{IMPROVEMENTS.md},
+\texttt{OPERATING\_MANUAL.md} and the architecture diagram source and PDF.
 
-The \texttt{ai\_worker-wip} branch also contains a \texttt{tmp\_readmes}
-directory, but with a different and older set of files. The presence of the
-directory is therefore not sufficient evidence of the correct branch; the file
-list is.
-
-\subsection{Documentation directory is excluded from version control}
-
-\caution{\texttt{tmp\_readmes/} appears in \texttt{.gitignore}. The files listed
-above are tracked because they were added with \texttt{git add -f}; a file newly
-created in that directory will not appear in \texttt{git status} and will not be
-committed by \texttt{git add .} or \texttt{git commit -a}. New documentation
-must be staged explicitly:}
-
-\begin{lstlisting}[style=sh]
-git add -f tmp_readmes/<new file>
-\end{lstlisting}
-
-\subsection{Building this manual}
-
-The source is \texttt{tmp\_readmes/HIL\_MANUAL.tex}. It requires no packages
-beyond a standard TeX Live installation and compiles unmodified on Overleaf.
-Two passes are required for cross-references.
-
-\begin{lstlisting}[style=sh]
-pdflatex HIL_MANUAL.tex
-pdflatex HIL_MANUAL.tex
-\end{lstlisting}
-
-Figure placeholders are listed in Appendix~C. Each is a dashed frame naming the
-file it expects; replace the \texttt{\textbackslash placeholder} call with
-\texttt{\textbackslash includegraphics} once the image exists.
+\remark{\texttt{tmp\_readmes/} is documentation and is not part of the software.
+The directory is excluded by \texttt{.gitignore} and the files are present only
+because they were staged with \texttt{git add -f}; nothing in the build, the
+launch files or the runtime reads from it. A new file placed there is invisible
+to \texttt{git status} and must be staged with \texttt{git add -f} to be
+committed. This manual builds with \texttt{pdflatex} run twice, or unmodified on
+Overleaf.}
 
 % =====================================================================
 \newpage
@@ -613,6 +587,10 @@ The leader and follower may both remain active for the duration of a session.
 They do not contend, because T14 suppresses the leader chain while the policy is
 driving. Contention between the two indicates that T14 is not being received.
 
+\placeholder{fig/leader_controls.png}{A2 leader, annotated: tact switch on
+each handle, and the joystick whose downward drag suspends and resumes the
+policy. These are the only two controls used during a session.}{5.5cm}
+
 \subsection{Intervention procedure}
 \label{sec:loop}
 
@@ -626,9 +604,24 @@ The following assumes the policy is executing.
 \item Drag the joystick downward and hold for one second. The policy resumes.
 \end{enumerate}
 
+\placeholder{fig/ui_state_ready.png}{Operator interface, policy loaded but not
+driving. Phase indicator reads ready; commands are not yet enabled.}{5.5cm}
+
+\placeholder{fig/ui_state_auto.png}{Policy driving. Phase indicator reads
+inferencing and the interface reports that policy actions are reaching the
+arms.}{5.5cm}
+
+\placeholder{fig/ui_state_human.png}{During an intervention. The human
+indicator is lit and the correction-length counter is advancing toward the
+forty-frame threshold.}{5.5cm}
+
 The tact switch is a toggle: engagement and release use the same control. The
 joystick gesture publishes a single empty message; the orchestrator determines
 whether it denotes suspension or resumption from the current phase.
+
+\placeholder{fig/intervention_timeline.png}{One intervention on a time axis:
+inference phase, teleoperation engagement, and the resulting per-frame label,
+showing the excluded intervals either side of the correction.}{5cm}
 
 The intervals between steps 1 and 2, and between steps 3 and 4, have the policy
 suspended and no arm engaged. These frames are labelled $-1$ and excluded from
@@ -645,6 +638,10 @@ mode 1 and disabled in mode 2. SG2 uses mode 2 by default.}
 \placeholder{fig/ui_online_rl.png}{Operator interface during an intervention,
 showing the human indicator, the correction-length counter and the sub-task
 instruction control.}{6.5cm}
+
+\placeholder{fig/ui_instruction.png}{Sub-task instruction control with the
+list open. The selection at each phase change is what divides the episode into
+correctly timed sub-segments.}{5.5cm}
 
 \subsection{Minimum correction length}
 
@@ -703,6 +700,10 @@ recording:
     - /tf
     - camera_info topics
 \end{lstlisting}
+
+\placeholder{fig/camera_views.png}{The four recorded camera streams as
+captured: head left and right, and the two wrist cameras. Three of the four are
+declared to the policy.}{6cm}
 
 \subsection{Dimensions}
 
@@ -1091,6 +1092,10 @@ The corrections comprise 6{,}765 frames against 55{,}701, and would therefore
 receive approximately 11 per cent of the mixture rather than 30. The mixture
 line in the launch log should be checked against the intended ratios.}
 
+\placeholder{fig/mixture_proportions.png}{Frame counts of the three datasets
+against the mixture ratios applied to them, showing the difference between
+weighting by size and weighting explicitly.}{5cm}
+
 \subsection{Warm start}
 
 The released checkpoint contains weights only. No optimiser state is present and
@@ -1135,6 +1140,10 @@ considerable repetition. Diffusion training injects noise at every step and
 state dropout contributes further regularisation. Repetition of a small
 correction set drawn from a single scene several hundred times constitutes
 memorisation rather than learning.
+
+\placeholder{fig/training_loss.png}{Training loss against step for the
+continuation run, with the base checkpoint's final loss marked for
+reference.}{5cm}
 
 \subsection{Checkpoint selection}
 
@@ -1219,6 +1228,9 @@ deployment-side settings and must be set to match.
       distinguishes a loaded policy from one that is driving the arms.
 \end{enumerate}
 
+\placeholder{fig/ui_policy_load.png}{Interface with the policy path set and
+the checkpoint loaded, before commands are enabled.}{5.5cm}
+
 \subsection{Control parameters}
 
 The deployed controller applies smoothing and rate limiting on top of the
@@ -1245,6 +1257,10 @@ removes jerk. The raw action chunk is approximately six times more aggressive
 than the human demonstrations. The blend length must remain shorter than the
 number of executed actions; if it is not, a new plan never takes effect before
 the next one arrives.}
+
+\placeholder{fig/rollout3d.png}{Cartesian rollout: commanded and
+demonstrated end-effector paths for one held-out episode, coloured by task
+phase, with the per-phase signed bias tabulated alongside.}{6.5cm}
 
 \subsection{Evaluation on hardware}
 
@@ -1287,6 +1303,10 @@ Video alignment       & Video and parquet disagreeing after re-encoding\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\placeholder{fig/verify_output.png}{A passing \texttt{verify\_dataset}
+report. The normaliser and video-alignment lines are the two that most often
+fail.}{5.5cm}
 
 \subsection{Post-conversion assertion}
 
@@ -1443,17 +1463,32 @@ Held-out validation set               & 4 episodes, 6{,}962 frames\\
 
 \section{Figure placeholders}
 
+Each is a dashed frame naming the file it expects. Replace the
+\texttt{\textbackslash placeholder} call with \texttt{\textbackslash
+includegraphics} once the image exists.
+
 \begin{center}
 \small
 \begin{tabular}{@{}ll@{}}
 \toprule
 \textbf{File} & \textbf{Content}\\
 \midrule
-\texttt{fig/session\_overview.png}      & Work cell during a session\\
-\texttt{fig/ui\_online\_rl.png}         & Operator interface during an intervention\\
-\texttt{fig/intervention\_recovery.png} & Joint speed, detected spans, disagreement\\
-\texttt{fig/checkpoint\_sweep.png}      & Held-out error against training step\\
-\texttt{fig/crop\_comparison.png}       & Head camera under the three candidate preparations\\
+\texttt{fig/leader\_controls.png} & A2 leader, tact switch and joystick annotated\\
+\texttt{fig/ui\_state\_ready.png} & Interface, policy loaded but not driving\\
+\texttt{fig/ui\_state\_auto.png} & Interface, policy driving\\
+\texttt{fig/ui\_state\_human.png} & Interface during an intervention\\
+\texttt{fig/intervention\_timeline.png} & Phase, engagement and label on a time axis\\
+\texttt{fig/ui\_online\_rl.png} & Interface during an intervention, full view\\
+\texttt{fig/ui\_instruction.png} & Sub-task instruction control\\
+\texttt{fig/camera\_views.png} & The four recorded camera streams\\
+\texttt{fig/crop\_comparison.png} & Head camera under the three candidate preparations\\
+\texttt{fig/intervention\_recovery.png} & Joint speed, detected spans, policy disagreement\\
+\texttt{fig/mixture\_proportions.png} & Frame counts against applied mixture ratios\\
+\texttt{fig/training\_loss.png} & Training loss against step\\
+\texttt{fig/checkpoint\_sweep.png} & Held-out error against training step\\
+\texttt{fig/ui\_policy\_load.png} & Interface with the checkpoint loaded\\
+\texttt{fig/rollout3d.png} & Cartesian rollout, commanded against demonstrated\\
+\texttt{fig/verify\_output.png} & A passing \texttt{verify\_dataset} report\\
 \bottomrule
 \end{tabular}
 \end{center}
