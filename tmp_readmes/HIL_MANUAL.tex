@@ -592,9 +592,11 @@ recording:
     - camera_info topics
 \end{lstlisting}
 
-\placeholder{fig/camera_views.png}{The four recorded camera streams as
-captured: head left and right, and the two wrist cameras. Three of the four are
-declared to the policy.}{6cm}
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{figs/camera_views.png}
+\caption{The four recorded streams, one frame from each. The wrist cameras are
+mounted such that the upper half of the frame is ceiling.}
+\end{figure}
 
 \subsection{Dimensions}
 
@@ -645,6 +647,13 @@ Square crop & Crop the longer axis to square. No padding; the cropped region is 
 \end{tabular}
 \end{center}
 
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{figs/crop_methods.png}
+\caption{The head camera under each method. Letterboxing preserves the field of
+view at the cost of padding; a centred square crop removes the outer 44 per cent
+of the width, which is where both arms operate.}
+\end{figure}
+
 \subsection{Why neither method is applied uniformly}
 
 Letterboxing every view, which is the default behaviour, placed 44 per cent of
@@ -658,11 +667,20 @@ taken, and they do not behave alike.
 \toprule
 \textbf{Camera} & \textbf{Measurement}\\
 \midrule
-Head  & Static context view. \textbf{50 per cent of its motion energy}, and 59 per cent during the driver grasp, lies in the lateral bands a centred square crop would remove. The smallest square retaining 90 per cent of that motion still costs 36 per cent padding.\\
+Head  & Static context view. \textbf{Approximately half of its motion energy}, and 59 per cent during the driver grasp, lies in the lateral bands a centred square crop would remove; 47.8 per cent measured on the episode shown in the figure. The smallest square retaining 90 per cent of that motion still costs 36 per cent padding.\\
 Wrist & Moving close-up. The upper half is ceiling, occupying \textbf{88 per cent of the frame at the grasp instant}. These are also the cameras with the finest resolution on the workspace, at 0.73 to 1.08\,mm per pixel.\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{figs/crop_evidence.png}
+\caption{Left: column-wise motion energy over one episode of the head camera.
+The two maxima correspond to the working volumes of the two arms and fall in the
+bands a centred square crop would remove; the minimum is the static table
+surface. Right: a wrist frame, with the region removed by the bottom-anchored
+crop shaded.}
+\end{figure}
 
 The head camera therefore has nothing worth removing, and the wrist cameras have
 nothing worth keeping above the midline.
@@ -699,6 +717,13 @@ Workspace content  & 18.6\,\% & 40.3\,\%\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{figs/crop_applied.png}
+\caption{The three inputs as presented to the model. The head retains its full
+field of view behind horizontal padding; the wrist views are cropped to the
+lower square, which removes the ceiling.}
+\end{figure}
 
 The increase in workspace content comes entirely from the wrist cameras; the
 head view is unchanged.
@@ -1439,8 +1464,6 @@ includegraphics} once the image exists.
 \texttt{fig/intervention\_timeline.png} & Phase, engagement and label on a time axis\\
 \texttt{fig/ui\_online\_rl.png} & Interface during an intervention, full view\\
 \texttt{fig/ui\_instruction.png} & Sub-task instruction control\\
-\texttt{fig/camera\_views.png} & The four recorded camera streams\\
-\texttt{fig/crop\_comparison.png} & Head camera under the three candidate preparations\\
 \texttt{fig/intervention\_recovery.png} & Joint speed, detected spans, policy disagreement\\
 \texttt{fig/mixture\_proportions.png} & Frame counts against applied mixture ratios\\
 \texttt{fig/training\_loss.png} & Training loss against step\\
