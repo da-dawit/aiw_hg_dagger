@@ -1,0 +1,110 @@
+diff --git a/gr00t/model/gr00t_n1d7/image_augmentations.py b/gr00t/model/gr00t_n1d7/image_augmentations.py
+index be73215..e8eeb99 100755
+--- a/gr00t/model/gr00t_n1d7/image_augmentations.py
++++ b/gr00t/model/gr00t_n1d7/image_augmentations.py
+@@ -321,6 +321,84 @@ class FractionalCenterCrop(A.DualTransform):
+         return ("crop_fraction",)
+ 
+ 
++class CropToSquare(A.DualTransform):
++    """Crop a non-square image to square instead of padding it with black bars.
++
++    LetterBoxPad makes every view the same square size (torch.stack in _get_vlm_inputs needs
++    identical dims) at the cost of black bars. On our rig that is 43% of the model input, and the
++    policy spends ~48% of its action->image attention on those bars (eval/attn_map.py).
++
++    Cropping reaches the same square with real pixels. The anchor matters: our wrist cameras are
++    PORTRAIT and the workspace sits in the lower band (measured content centroid 0.76 at the grasp,
++    band ~rows 233-424 of 424), so a centre crop would cut the bottom off. Portrait -> anchor at the
++    bottom; landscape -> centre.
++
++    Enabled by GR00T_SQUARE_CROP=1 so it can be A/B'd against LetterBoxPad without a code edit.
++    """
++
++    def __init__(self, p: float = 1.0, always_apply: bool | None = None):
++        super().__init__(p=p, always_apply=always_apply)
++
++    #GR00T_ROI_JSON, if set, holds hand-drawn per-camera ROIs from eval/pick_roi.py, keyed by the
++    #source frame size (a camera is identified by its HxW -- the transform sees no camera name).
++    #Falls back to the geometric rule when a size has no entry.
++    _ROI = None
++
++    @classmethod
++    def _rois(cls):
++        """ROIs keyed by ASPECT RATIO and stored as FRACTIONS of the frame.
++
++        Keying on exact pixel size meant a camera that changed resolution between training and
++        deployment silently missed the lookup and fell back to the geometric rule -- a different
++        crop than the policy was trained on, with no error. Fractions make the ROI scale-free:
++        the same field of view at any resolution, as long as the aspect ratio matches.
++        """
++        if cls._ROI is None:
++            import os, json
++            cls._ROI = {}
++            path = os.environ.get("GR00T_ROI_JSON")
++            if path and os.path.exists(path):
++                for _, r in json.load(open(path)).items():
++                    H, W = float(r["H"]), float(r["W"])
++                    cls._ROI[round(W / H, 3)] = dict(
++                        top=r["top"] / H, left=r["left"] / W,
++                        height=r["height"] / H, width=r["width"] / W)
++        return cls._ROI
++
++    def apply(self, img: np.ndarray, **params) -> np.ndarray:
++        h, w = img.shape[:2]
++        r = self._rois().get(round(w / h, 3))
++        if r is not None:
++            #Crop to the ROI rectangle, then pad THAT to square. A square ROI pads nothing; a wider
++            #ROI pads only in proportion to its own aspect, not the full frame's. That lets the head
++            #camera keep a wide field of view at a fraction of the 44% the full-frame letterbox cost,
++            #while the wrist cameras (where the precision is) stay at 0%.
++            ch = int(np.clip(round(r["height"] * h), 1, h))
++            cw = int(np.clip(round(r["width"] * w), 1, w))
++            cy = r["top"] * h + r["height"] * h / 2.0
++            cx = r["left"] * w + r["width"] * w / 2.0
++            top = int(np.clip(round(cy - ch / 2.0), 0, h - ch))
++            left = int(np.clip(round(cx - cw / 2.0), 0, w - cw))
++            sub = img[top:top + ch, left:left + cw]
++            if ch == cw:
++                return sub
++            side = max(ch, cw)
++            out = np.zeros((side, side, sub.shape[2]), sub.dtype)
++            out[(side - ch) // 2:(side - ch) // 2 + ch, (side - cw) // 2:(side - cw) // 2 + cw] = sub
++            return out
++        if h == w:
++            return img
++        side = min(h, w)
++        if h > w:                       # PORTRAIT -> keep the bottom (the workspace)
++            top, left = h - side, 0
++        else:                           # LANDSCAPE -> centre
++            top, left = 0, (w - side) // 2
++        return img[top:top + side, left:left + side]
++
++    def get_transform_init_args_names(self):
++        return ()
++
++
+ class LetterBoxPad(A.DualTransform):
+     """Pad non-square images to square by adding black bars (letterboxing).
+ 
+@@ -417,8 +495,10 @@ def build_image_transformations_albumentations(
+ 
+     # Training transforms (using ReplayCompose for consistent augmentation across views)
+     # Use SmallestMaxSize to preserve aspect ratios, with INTER_AREA for antialiasing
++    import os as _os
++    _SQ = _os.environ.get("GR00T_SQUARE_CROP", "0") == "1"
+     train_transform_list = [
+-        LetterBoxPad(),
++        CropToSquare() if _SQ else LetterBoxPad(),
+         A.SmallestMaxSize(max_size=max_size, interpolation=cv2.INTER_AREA),
+         FractionalRandomCrop(crop_fraction=fraction_to_use),
+         A.SmallestMaxSize(max_size=max_size, interpolation=cv2.INTER_AREA),
+@@ -479,7 +559,7 @@ def build_image_transformations_albumentations(
+     # Use SmallestMaxSize to preserve aspect ratios, with INTER_AREA for antialiasing
+     eval_transform = A.Compose(
+         [
+-            LetterBoxPad(),
++            CropToSquare() if _SQ else LetterBoxPad(),
+             A.SmallestMaxSize(max_size=max_size, interpolation=cv2.INTER_AREA),
+             FractionalCenterCrop(crop_fraction=fraction_to_use),
+             A.SmallestMaxSize(max_size=max_size, interpolation=cv2.INTER_AREA),

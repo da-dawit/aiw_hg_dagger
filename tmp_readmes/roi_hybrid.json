@@ -1,0 +1,26 @@
+{
+  "observation.images.rgb.cam_left_head": {
+    "top": 0,
+    "left": 0,
+    "height": 376,
+    "width": 672,
+    "H": 376,
+    "W": 672
+  },
+  "observation.images.rgb.cam_left_wrist": {
+    "top": 184,
+    "left": 0,
+    "height": 240,
+    "width": 240,
+    "H": 424,
+    "W": 240
+  },
+  "observation.images.rgb.cam_right_wrist": {
+    "top": 184,
+    "left": 0,
+    "height": 240,
+    "width": 240,
+    "H": 424,
+    "W": 240
+  }
+}
