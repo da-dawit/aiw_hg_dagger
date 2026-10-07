@@ -3,8 +3,8 @@
 %  System Manual
 %
 %  Compile: pdflatex (twice, for cross-references), or upload to Overleaf.
-%  Colour policy: body text, tables and callouts are monochrome and print
-%  correctly in greyscale. Colour is used only in the architecture figures
+%  Color policy: body text, tables and callouts are monochrome and print
+%  correctly in grayscale. Color is used only in the architecture figures
 %  and in code listings, where it carries information rather than decoration.
 %
 %  Figure placeholders use \placeholder{file}{description}{height}.
@@ -135,7 +135,7 @@ from it.
 \end{minipage}
 
 \vfill
-{\small ROBOTIS \quad 31 August 2026}
+{\small ROBOTIS \quad August 31, 2026}
 \end{titlepage}
 
 \tableofcontents
@@ -157,7 +157,7 @@ The system comprises three containers and a browser client.
 \texttt{ai\_worker}          & Hardware. Leader and follower arms, head, lift, swerve base, four cameras.\\
 \texttt{groot\_server}       & Policy inference. GR00T-N1.7 on a TensorRT DiT backend.\\
 \texttt{cyclo\_intelligence} & Orchestration, recording, dataset conversion, external interfaces.\\
-Browser                      & Operator interface for policy control, intervention and labelling.\\
+Browser                      & Operator interface for policy control, intervention and labeling.\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -167,8 +167,8 @@ lift and mobile base are never commanded by the policy ($22-6=16$).
 
 \subsection{Shared command topic}
 
-The teleoperation node and the policy publish to the same arm-command topic (thus the SG2 robot).
-There is no separate policy channel. There are two consequences that follow:
+On the SG2, the teleoperation node and the policy publish to the same arm-command topic.
+There is no separate policy channel, which has two consequences:
 
 \begin{enumerate}
 \item The recorded \texttt{action} column is valid irrespective of which agent
@@ -179,7 +179,7 @@ There is no separate policy channel. There are two consequences that follow:
 
 \subsection{Session structure}
 
-The policy executes the task autonomously. When its behaviour is incorrect the
+The policy executes the task autonomously. When its behavior is incorrect, the
 operator suspends it, corrects the motion by teleoperation, and returns control.
 The corrected frames constitute the training signal. The purpose of the
 surrounding system is to make this exchange safe and to record which frames
@@ -205,19 +205,19 @@ originated from the operator.
 \toprule
 \textbf{Repository} & \textbf{Branch} & \textbf{Contents}\\
 \midrule
-\texttt{da-dawit/aiw\_backup}                & \texttt{feature-a2} & Robot-side packages; for a2 leader\\
-\texttt{da-dawit/cyclo\_intelligence\_backup} & \texttt{main}       & Orchestration, recording, conversion\\
+\texttt{da-dawit/aiw\_hg\_dagger}                & \texttt{feature-a2} & Robot-side packages, A2 leader support\\
+\texttt{da-dawit/cyclo\_intelligence\_hg\_dagger} & \texttt{main}       & Orchestration, recording, conversion\\
 \texttt{da-dawit/hg-dagger}                  & \texttt{main}       & Training, evaluation and dataset tooling\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The first two are private; SSH Keys.
+All three are public and can be cloned over HTTPS.
 
 \begin{lstlisting}[style=sh]
-git clone git@github.com:da-dawit/aiw_backup.git
-git clone git@github.com:da-dawit/cyclo_intelligence_backup.git
-git clone git@github.com:da-dawit/hg-dagger.git
+git clone https://github.com/da-dawit/aiw_hg_dagger.git
+git clone https://github.com/da-dawit/cyclo_intelligence_hg_dagger.git
+git clone https://github.com/da-dawit/hg-dagger.git
 \end{lstlisting}
 
 \texttt{hg-dagger} contains the scripts referenced throughout
@@ -239,20 +239,21 @@ Sections~\ref{sec:train} to~\ref{sec:verify}:
 \texttt{scripts/attn\_map.py}            & Attention diagnostics\\
 \texttt{scripts/crop\_stats.py}          & Motion energy and detail per crop region\\
 \texttt{configs/roi\_hybrid.json}        & Per-camera crop specification\\
-\texttt{configs/crop\_to\_square.patch}  & Required patch to Isaac-GR00T\\
+\texttt{configs/crop\_to\_square.patch}  & Required patch to Isaac-GR00T: per-camera crop\\
+\texttt{configs/mixture\_ratio.patch}    & Required patch to Isaac-GR00T: dataset mixture ratios\\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \subsection{Branch selection}
 
-\texttt{aiw\_backup} carries two branches. The default is
-\texttt{ai\_worker-wip}; the work described in this manual is on
-\texttt{feature-a2}, which is thirteen commits ahead of it. A plain clone
-therefore checks out the wrong branch.
+\texttt{aiw\_hg\_dagger} carries two branches. The work described in this
+manual is on \texttt{feature-a2}, which is the default and is 32 commits ahead
+of \texttt{ai\_worker-wip}. A plain clone therefore checks out the correct
+branch; the checkout below confirms it.
 
 \begin{lstlisting}[style=sh]
-cd aiw_backup
+cd aiw_hg_dagger
 git checkout feature-a2
 \end{lstlisting}
 
@@ -269,7 +270,7 @@ branch. Nothing is lost and the two histories can be compared directly.
 
 \begin{lstlisting}[style=sh]
 cd <existing working copy>
-git remote add backup git@github.com:da-dawit/aiw_backup.git
+git remote add backup https://github.com/da-dawit/aiw_hg_dagger.git
 git fetch backup
 
 # What does this branch contain that the local one does not?
@@ -305,7 +306,7 @@ requirement is memory rather than throughput.
 \midrule
 Parameters, FP32              & 12.6\,GB\\
 Gradients, FP32               & 6.5\,GB\\
-Optimiser state, FP32         & 13.0\,GB\\
+Optimizer state, FP32         & 13.0\,GB\\
 \midrule
 Total before activations      & 32.1\,GB\\
 \bottomrule
@@ -344,14 +345,14 @@ uv run huggingface-cli login --token $HF_TOKEN
 training begins. Without \texttt{crop\_to\_square.patch} every camera is
 letterboxed, which differs from the configuration the base checkpoint was
 trained under. Without \texttt{mixture\_ratio.patch} the \texttt{path@ratio}
-syntax is not parsed, all datasets are collapsed into one specification.}
+syntax is not parsed, and all datasets are collapsed into one specification.}
 \subsection{The base policy}
 \label{sec:base}
 
 This manual covers the HG-DAgger iteration. It begins from a policy that already
 performs the task well enough to be worth correcting and improves it from
-operator corrections. Producing that policy is separate work, behaviour cloning
-on teleoperated demonstrations, and is not described here.
+operator corrections. Producing that policy is separate work (behavior cloning
+on teleoperated demonstrations) and is not described here.
 
 The reference base policy is checkpoint 30{,}000 of a sixteen-dimension run over
 31 screwing demonstrations. Download it, or an equivalent of your own, before
@@ -359,7 +360,7 @@ starting.
 
 \begin{lstlisting}[style=sh]
 huggingface-cli download dawity/groot_screwing35 \
-    --include "<base-checkpoint>/*" --local-dir runs/16d_30k/
+    --include "16d_30k/checkpoint-30000/*" --local-dir runs/
 \end{lstlisting}
 
 \caution{The base policy must have been trained under the image preparation of
@@ -371,8 +372,8 @@ to are not the inputs it would now receive.}
 % =====================================================================
 \section{Architecture}
 
-The two diagrams overleaf present the runtime control path and the data path
-respectively. Edge labels refer to the identifiers defined in
+The two diagrams on the following pages present the runtime control path and
+the data path, respectively. Edge labels refer to the identifiers defined in
 Section~\ref{sec:legend}.
 
 \begin{center}
@@ -489,7 +490,7 @@ phase boundary.}
 \includegraphics[width=\linewidth]{figs/ui_state_human.png}
 \caption{An intervention in progress. The banner reads \textsc{human}, \emph{Resume
 policy} is the available control, and the counter reads 105 frames against 66
-training windows --- one window for every frame past the fortieth. Frames
+training windows --- one window for each frame from the fortieth onward. Frames
 recorded in this state carry label 1.}
 \label{fig:uihuman}
 \end{figure}
@@ -508,13 +509,13 @@ showing the excluded intervals either side of the correction.}
 \end{figure}
 
 The intervals between steps 1 and 2, and between steps 3 and 4, have the policy
-suspended and no arm engaged. These frames are labelled $-1$ and excluded from
+suspended and no arm engaged. These frames are labeled $-1$ and excluded from
 training. No urgency is required at these points.
 
 \remark{In control mode 2, engagement captures a leader anchor and a follower
 anchor and thereafter commands
 \texttt{goal = follower\_anchor + (leader\_now - leader\_anchor)}.
-As the leader is moved, the follower moves in delta from its stopped position. Mode 1 relays absolute leader positions and does exhibit such motion, which is why slow start is enabled in
+As the leader moves, the follower moves by the same displacement from where it stopped, so engagement causes no jump. Mode 1 relays absolute leader positions and does jump on engagement, which is why slow start is enabled in
 mode 1 and disabled in mode 2. SG2 uses mode 2 by default.}
 
 \begin{figure}[H]
@@ -529,12 +530,15 @@ divides an episode into correctly timed sub-segments and is written to
 
 \subsection{Minimum correction length}
 
-A training sample is a window of forty consecutive frames, corresponding to one
-action chunk, rather than an individual frame. A run of $n$ intervened frames
-therefore yields at most $n-39$ windows, and a run shorter than forty frames
-yields none.
+The export counts a correction in windows of forty consecutive frames rather
+than in individual frames, and discards any run shorter than forty frames
+(\texttt{export\_dagger\_split.py}, \texttt{--min-run 40}). A run of $n$
+intervened frames therefore yields $n-39$ windows, and a run shorter than forty
+frames yields none. The threshold was set for an earlier 40-step model; the
+current checkpoint's action chunk is sixteen steps, so forty frames is the
+stricter of the two limits.
 
-\caution{Sample yield is strongly non-linear in correction length. A run of 45
+\caution{Sample yield is strongly nonlinear in correction length. A run of 45
 frames yields 6 windows; a run of 120 frames yields 81. A session composed of
 short corrections may convert without error and produce no training data. At
 30\,Hz, forty frames is 1.33 seconds; corrections of several seconds are
@@ -643,10 +647,10 @@ Darkened: image discarded.}
 
 \subsection{Why neither method is applied uniformly}
 
-Letterboxing every view, which is the default behaviour, places 43.6 per cent of
-each model input in black bars. Cropping every view to square removes that
-waste but discards image. The two camera types were measured separately before
-the decision was taken, and they do not behave alike.
+Letterboxing every view, which is the default behavior, places an average of
+43.6 percent of each model input in black bars. Cropping every view to square
+removes that waste but discards part of the image. The two camera types were
+measured separately before the decision was made, and they do not behave alike.
 
 \begin{center}
 \small
@@ -654,8 +658,8 @@ the decision was taken, and they do not behave alike.
 \toprule
 \textbf{Camera} & \textbf{Measurement}\\
 \midrule
-Head  & Fixed mounting, so frame-to-frame change is task activity. \textbf{47.8 per cent of its motion energy}, and 67.4 per cent during the driver grasp, lies in the lateral bands a centred square crop would remove.\\
-Wrist & Moving mounting, so most frame-to-frame change is background sweeping past the lens; motion energy does not measure task content here. By spatial detail, the band a bottom-anchored crop removes is \textbf{43.4 per cent of the frame carrying 38.7 per cent of its gradient energy}, which is close to proportionate. These are also the cameras with the finest resolution on the workspace, at 0.73 to 1.08\,mm per pixel.\\
+Head  & Fixed mounting, so frame-to-frame change is task activity. \textbf{47.8 percent of its motion energy}, and 67.4 percent during the driver grasp, lies in the lateral bands a centered square crop would remove.\\
+Wrist & Moving mounting, so most frame-to-frame change is background sweeping past the lens; motion energy does not measure task content here. By spatial detail, the band a bottom-anchored crop removes is \textbf{43.4 percent of the frame carrying 38.7 percent of its gradient energy}, which is close to proportionate. These are also the cameras with the finest resolution on the workspace, at 0.73 to 1.08\,mm per pixel.\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -669,7 +673,7 @@ bottom-anchored crop line.}
 \label{fig:cropevidence}
 \end{figure}
 
-A centred square crop of the head camera would therefore remove the columns in
+A centered square crop of the head camera would therefore remove the columns in
 which the work occurs. The wrist cameras carry no equivalent argument in either
 direction; the case for cropping them is the padding it avoids and the held-out
 measurement in Section~\ref{sec:cropeval}.
@@ -682,7 +686,7 @@ regeneration script is \texttt{scripts/crop\_stats.py}.}
 \subsection{The applied configuration}
 
 Each view must be square, but the squares need not be of equal size: a trailing
-resize normalises all of them to 256$\times$256 before they are stacked.
+resize normalizes all of them to 256$\times$256 before they are stacked.
 
 \begin{center}
 \small
@@ -691,8 +695,8 @@ resize normalises all of them to 256$\times$256 before they are stacked.
 \textbf{Camera} & \textbf{Source} & \textbf{Prepared} & \textbf{Padding}\\
 \midrule
 \texttt{cam\_left\_head}   & 672$\times$376, full frame     & 672$\times$672 & 44.0\,\%\\
-\texttt{cam\_left\_wrist}  & 240$\times$240, rows 184--424  & 240$\times$240 & 0\,\%\\
-\texttt{cam\_right\_wrist} & 240$\times$240, rows 184--424  & 240$\times$240 & 0\,\%\\
+\texttt{cam\_left\_wrist}  & 240$\times$424, rows 184--424  & 240$\times$240 & 0\,\%\\
+\texttt{cam\_right\_wrist} & 240$\times$424, rows 184--424  & 240$\times$240 & 0\,\%\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -759,8 +763,8 @@ launcher verifies the patch before starting.}
 The action expert cross-attends to the image tokens at eight of the diffusion
 transformer's blocks, over four denoising steps. Each view is 8$\times$8 tokens,
 192 in all; the values are averaged over heads and over the action queries and
-aggregated across those 32 captures. Each panel is normalised over its own 64
-tokens, so colour is comparable within a panel and not between panels.
+aggregated across those 32 captures. Each panel is normalized over its own 64
+tokens, so color is comparable within a panel and not between panels.
 
 The same checkpoint was run twice on one frame of the place-in-hole phase,
 once under the applied crop and once with every view letterboxed. Only the image
@@ -773,7 +777,7 @@ instruction are identical, and the figure asserts that before it is drawn.
 \toprule
 & \textbf{Applied crop} & \textbf{Uniform letterbox}\\
 \midrule
-Normalised entropy over the 192 tokens & 0.9851 & 0.9885\\
+Normalized entropy over the 192 tokens & 0.9851 & 0.9885\\
 Share held by the 8 strongest tokens   & 9.1\,\% & 8.4\,\%\\
 Padding's share of the token grid      & 16.7\,\% & 50.0\,\%\\
 Attention landing on padding           & 18.9\,\% & 48.8\,\%\\
@@ -781,18 +785,18 @@ Attention landing on padding           & 18.9\,\% & 48.8\,\%\\
 \end{tabular}
 \end{center}
 
-A uniform distribution would give the eight strongest tokens 4.2 per cent, and
+A uniform distribution would give the eight strongest tokens 4.2 percent, and
 would put exactly as much attention on padding as padding holds of the grid.
-Both configurations sit close to that: the last two rows differ by around two
-percentage points each. Letterboxing does not make the policy attend to black
+Both configurations sit close to that: the last two rows differ by 2.2
+percentage points under the applied crop and by 1.2 under the letterbox. Letterboxing does not make the policy attend to black
 bars in preference to the workspace; it gives it three times as many of them to
 spread over, and the wrist views lose the workpiece to ceiling and wall in the
 process.
 
 \remark{All five phases of the episode were measured, not only the one shown.
 The additional attention spent on padding under a uniform letterbox ranges from
-25.8 per cent at the bolt grasp to 30.8 per cent at the home pose, against 29.8
-per cent here. The effect is a property of the token grid rather than of the
+25.8 percentage points at the bolt grasp to 30.8 at the home pose, against 29.8
+here. The effect is a property of the token grid rather than of the
 frame, so the figure is representative of the episode and not the best case in
 it.}
 
@@ -811,7 +815,7 @@ checkpoint 30{,}000, under the two image preparations. Rows one and two are the
 applied crop, rows three and four the uniform letterbox; within each pair the
 first row is the views as the model receives them and the second the same views
 with the attention overlaid. The language instruction, shown above, was the same
-in both runs. Each panel is min-max normalised over its own 64 tokens, so red
+in both runs. Each panel is min-max normalized over its own 64 tokens, so red
 marks that panel's strongest tokens and is not comparable between panels.}
 \label{fig:attnmap}
 \end{figure}
@@ -910,7 +914,7 @@ The sequence below takes a converted session through to a selected checkpoint.
 Paths are written relative to the training root.
 
 \begin{lstlisting}[style=sh]
-# 1. Validate the converted dataset. Refuses on a degenerate normaliser.
+# 1. Validate the converted dataset. Refuses on a degenerate normalizer.
 python3 scripts/verify_dataset.py --root datasets/<session> --isaac
 
 # 2. If the export lacks the intervention column, repair it first.
@@ -960,7 +964,7 @@ weighted by size.}
 
 Isaac-GR00T provides no per-frame loss weighting. The frame-level weighting
 scheme is therefore approximated at the dataset level using mixture ratios, and
-the partition is performed at export time. For instance:
+the partition is performed at export time. For the reference session:
 
 \begin{center}
 \small
@@ -979,23 +983,28 @@ Each intervention is exported as an independent episode. Video is indexed per
 episode and the policy consumes action chunks; concatenating two interventions
 into one episode would introduce a transition that did not occur.
 
+The policy count is 388 frames below the session's 32{,}192 policy-labeled
+frames (Section~\ref{sec:assert}) because the export also drops the two
+seconds before each takeover and any policy run shorter than forty frames.
+
 \caution{In the absence of explicit ratios the loader weights datasets by size.
 The corrections are 6{,}765 frames of the 94{,}270 in the mixture and would
-therefore receive 7 per cent of it rather than 30. The mixture line in the
+therefore receive 7 percent of it rather than 30 percent. The mixture line in the
 launch log should be checked against the intended ratios.}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{figs/mixture_proportions.png}
 \caption{Each dataset's share of the training mixture: what weighting by size would
-give, against the ratios actually applied. The corrections are the only ones
-that move materially, from 7 per cent to 30.}
+give, against the ratios actually applied. The original demonstrations barely
+move, from 59 to 60 percent; the corrections rise from 7 to 30 percent and the
+policy frames fall from 34 to 10 percent.}
 \label{fig:mixture}
 \end{figure}
 
 \subsection{Warm start}
 
-The base checkpoint contains weights only. No optimiser state is present and its
+The base checkpoint contains weights only. No optimizer state is present and its
 cosine schedule has annealed to approximately $3 \times 10^{-13}$, so there is
 nothing to resume; the continuation is a fresh schedule over pretrained weights.
 The learning rate is the one parameter that must change. At the base run's
@@ -1037,15 +1046,15 @@ The step count should be selected by dataset exposure rather than elapsed time.
 Exposure is counted as steps $\times$ batch $\times$ the dataset's mixture
 ratio, divided by its frame count. The architecture tolerates a good deal of
 repetition, since diffusion training injects noise at every step and state
-dropout regularises further; the base run reached 68.9 epochs over the original
+dropout regularizes further; the base run reached 68.9 epochs over the original
 data without degrading. The correction set does not have that latitude.
 Thirty-nine runs from a single scene, repeated several hundred times, are
-memorised rather than learned, which is what bounds the budget above.
+memorized rather than learned, which is what bounds the budget above.
 
 \begin{figure}
     \centering
     \includegraphics[width=0.8\linewidth]{trainingloss.png}
-    \caption{Training loss for HG-DAgger Iteration ($n=1$)}
+    \caption{Training loss for the first HG-DAgger iteration ($n=1$).}
     \label{fig:trainloss}
 \end{figure}
 
@@ -1096,12 +1105,14 @@ huggingface-cli download dawity/groot_dagger_it1 \
 
 A checkpoint comprises fifteen files. A directory containing fewer than fifteen
 is an incomplete transfer and will fail to load; the file count should be
-confirmed before deployment.
+confirmed before deployment. The results in this manual use the final
+checkpoint, \texttt{checkpoint-6000}; recordings and rollout videos are linked
+in Section~\ref{sec:links}.
 
 \subsection{Configuration that must match training}
 
 \caution{The following are properties of the checkpoint, not of the deployment,
-and a mismatch produces degraded behaviour rather than an error.}
+and a mismatch produces degraded behavior rather than an error.}
 
 \begin{center}
 \small
@@ -1113,14 +1124,14 @@ Declared dimensions & 16, both arms      & Input is scaled incorrectly\\
 Cameras             & 3 of the 4 recorded & An unseen view is supplied\\
 Crop                & Per-camera, \texttt{roi\_hybrid.json} & Framing differs from training\\
 \texttt{crop\_fraction} & 1.0            & Random cropping is reintroduced\\
-\texttt{use\_percentiles} & false        & Normalisation differs\\
-Action horizon      & 40                 & Chunk length differs\\
+\texttt{use\_percentiles} & false        & Normalization differs\\
+Action horizon      & 16                 & Chunk length differs\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The last two are read from the checkpoint's own configuration and are already
-correct in the published checkpoints. The camera selection and crop are
+The last three are read from the checkpoint's own configuration and are
+already correct in the published checkpoints. The camera selection and crop are
 deployment-side settings and must be set to match.
 
 \subsection{Bringing the policy up}
@@ -1146,8 +1157,9 @@ TensorRT engine reports ready. The arms are not yet being driven.}
 
 \subsection{Control parameters}
 
-The deployed controller applies smoothing and rate limiting on top of the
-policy's output.
+The deployed runtime, \texttt{groot\_server}, aligns, resamples and blends each
+chunk before it reaches the arms. Its settings for this checkpoint are set in
+\texttt{docker/docker-compose.yml} of the Cyclo Intelligence repository.
 
 \begin{center}
 \small
@@ -1155,29 +1167,34 @@ policy's output.
 \toprule
 \textbf{Parameter} & \textbf{Value} & \textbf{Function}\\
 \midrule
-Chunk length        & 50 & Actions produced per inference\\
-Executed            & 25 & Actions executed before replanning\\
-Blend               & 20 & Cubic overlap between successive chunks\\
-Smoothing window    & 9  & Savitzky--Golay window\\
-Velocity clamp      & 0.6\,rad/s & Limit against the previous command\\
-Acceleration clamp  & 2.0\,rad/s\textsuperscript{2} & Limit on commanded acceleration\\
+Chunk length      & 16 & Actions returned per inference\\
+Chunk time base   & 15\,Hz & Spacing assumed between actions in a chunk\\
+Control rate      & 100\,Hz & Chunk linearly resampled to one command per tick\\
+Blend             & 0.08\,s & Cross-fade from the last command into a new chunk\\
+Alignment window  & 0.1\,s & Search range for the chunk point closest to the last command\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+The blend and alignment window are reduced from their defaults of 0.2\,s and
+0.3\,s, which were tuned for 40-step chunks. The velocity and acceleration
+clamps in \texttt{spec\_sg2.py} (0.6\,rad/s and 2.0\,rad/s\textsuperscript{2})
+belong to the standalone \texttt{infer.py} path, which does not drive this
+robot.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figs/rollout3d.png}
 \caption{Open-loop Cartesian rollout over one held-out episode, in three views. The
-dark line is the demonstrated end-effector path and the coloured segments are
-the policy's, one colour per task phase; the thin red segments join each
+dark line is the demonstrated end-effector path and the colored segments are
+the policy's, one color per task phase; the thin red segments join each
 commanded point to the demonstrated one at the same instant.}
 \label{fig:rollout}
 \end{figure}
 
 \subsection{Evaluation on hardware}
 
-\caution{Offline metrics do not establish robot behaviour. Held-out evaluation
+\caution{Offline metrics do not establish robot behavior. Held-out evaluation
 measures agreement with the original demonstrations, and a correction is by
 definition a departure from them, so a policy that has learned the corrections
 may score worse. Hardware execution is the only measurement that distinguishes
@@ -1192,10 +1209,42 @@ training data cannot correct the latter.
 \centering
 \includegraphics[width=\linewidth]{figs/hardware_rollout.png}
 \caption{The session on the physical robot, sampled across its 116 seconds. Each
-panel shows the three camera views at that instant, bordered and labelled by
+panel shows the three camera views at that instant, bordered and labeled by
 which side was driving. The three red panels fall inside the operator's
 takeovers, at 31--34, 58.5--64.5 and 78--84 seconds.}
 \label{fig:hwrollout}
+\end{figure}
+
+One HG-DAgger round (13 corrected episodes and 6{,}000 training steps on top of
+the 30{,}000-step base policy) made the long-horizon bolt-screwing task succeed
+end to end. Each value below is the share of all 30 trials that completed that
+stage.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Stage} & \textbf{Base policy} & \textbf{After one round}\\
+\midrule
+Grasp the bolt                & 100\,\% & 100\,\%\\
+Place the bolt in the hole    & 40\,\%  & 100\,\%\\
+Grasp the driver              & 10\,\%  & 87\,\%\\
+Screw in the bolt             & 0\,\%   & 40\,\%\\
+Place and return              & 0\,\%   & 40\,\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every trial that finished screwing also completed place and return (100\,\% of
+those trials), so end-to-end success rose from 0\,\% to 40\,\%. Higher rates
+will need more correction episodes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\linewidth]{figs/success.png}
+\caption{The bolt seated in the block on the physical robot, both arms clear of
+the workpiece at the end of the episode.}
+\label{fig:peginhole}
 \end{figure}
 
 % =====================================================================
@@ -1220,7 +1269,7 @@ Freeze frames         & Stationary arm under a label commanding motion\\
 Label consistency     & Inconsistent phase semantics across episodes\\
 Camera shapes         & Unannounced resolution change\\
 Modality declaration  & Dimensions declared but not supplied\\
-Normaliser            & Declared dimension of zero range\\
+Normalizer            & Declared dimension of zero range\\
 Dataset version       & Layout not matching the required version\\
 Video alignment       & Video and parquet disagreeing after re-encoding\\
 \bottomrule
@@ -1231,13 +1280,14 @@ Video alignment       & Video and parquet disagreeing after re-encoding\\
 \centering
 \includegraphics[width=\linewidth]{figs/verify_output.png}
 \caption{A passing \texttt{verify\_dataset} report over \texttt{dagger\_human}. The
-normaliser and video-alignment checks are the two that most often fail. The
+normalizer and video-alignment checks are the two that most often fail. The
 closing warning concerns the absence of a separate validation set, not a fault
 in the dataset.}
 \label{fig:verify}
 \end{figure}
 
 \subsection{Post-conversion assertion}
+\label{sec:assert}
 
 \begin{lstlisting}[style=py]
 import pandas as pd, glob, json
@@ -1290,14 +1340,12 @@ T18 & Topic, latched & \texttt{home\_in\_progress}     & Home pose              
 T19 & Service        & \texttt{/task/command}          & Sub-task instruction update  & 11\\
 \bottomrule
 \end{longtable}}
-
-\placeholder{figs/rqt_graph.png}{Capture with \texttt{rqt\_graph} while the
-policy is driving, with T6 and both of its publishers in frame.}{6cm}
-
 \subsection{Notes}
 \label{sec:legendnotes}
 
 \begin{enumerate}[leftmargin=8mm]
+
+
 \item The recording trigger is disabled. A single press additionally engages the
       corresponding arm.
 \item Supports enable, disable and toggle. The tact switch issues a toggle.
@@ -1334,7 +1382,7 @@ All frames carry one sub-task label & The instruction was not updated during the
 Interface indicator inconsistent with the robot & The indicator is a conjunction of policy state and teleoperation state; a stale input yields an incorrect indicator.\\
 An intervention produced no training samples & The run was shorter than forty frames.\\
 Dataset lacks the intervention column & Either the recording carried no \texttt{/task/inference\_status}, in which case there was no policy to intervene in, or the export predates the writer emitting it. See Section~\ref{sec:defect}.\\
-Training loss decreases as behaviour degrades & Expected with a small correction set. Select by held-out Cartesian error.\\
+Training loss decreases as behavior degrades & Expected with a small correction set. Select by held-out Cartesian error.\\
 Video files empty after conversion & Conversion preceded completion of the recording flush. Confirm the bag contains frames and re-run.\\
 \bottomrule
 \end{longtable}}
@@ -1357,8 +1405,9 @@ Human-gated DAgger. The policy executes and the operator
 determines when to intervene. Only intervened frames are treated as expert data,
 and they are aggregated with the original demonstrations rather than replacing
 them.
-\item[Action chunk] The block of future actions produced by one inference. Forty
-frames in this system, which establishes the minimum useful correction length.
+\item[Action chunk] The block of future actions produced by one inference.
+Sixteen steps in this system. The export's forty-frame minimum on corrections is
+a separate, stricter threshold.
 \item[Latched topic] A topic on which a subscriber receives the current value
 upon connection.
 \item[Relative-delta teleoperation] Control mode 2. The follower is commanded by
@@ -1376,9 +1425,9 @@ measurements rather than constants and should be regenerated rather than quoted.
 \small
 \begin{tabular}{@{}lr@{}}
 \toprule
-Control rate                          & 30\,Hz\\
-Action chunk                          & 40 frames\\
-Minimum useful correction             & 1.33\,s\\
+Recording rate                        & 30\,Hz\\
+Action chunk                          & 16 steps\\
+Minimum exported correction           & 40 frames, 1.33\,s\\
 Base policy warm-started from         & 30{,}000 steps\\
 Original demonstrations               & 31 episodes, 55{,}701 frames\\
 Session recording                     & 13 episodes, 43{,}686 frames\\
@@ -1388,5 +1437,29 @@ Held-out validation set               & 4 episodes, 6{,}962 frames\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+% =====================================================================
+\section{Links}
+\label{sec:links}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{8.4cm}@{}}
+\toprule
+\textbf{Repository} & \textbf{Contents}\\
+\midrule
+\href{https://github.com/da-dawit/aiw_hg_dagger}{\texttt{aiw\_hg\_dagger}}
+  & Robot-side packages, branch \texttt{feature-a2}; this manual and its figures under \texttt{tmp\_readmes/}\\
+\href{https://github.com/da-dawit/cyclo_intelligence_hg_dagger}{\texttt{cyclo\_intelligence\_hg\_dagger}}
+  & Orchestration, recording, dataset conversion, operator interface\\
+\href{https://github.com/da-dawit/hg-dagger}{\texttt{hg-dagger}}
+  & Training, evaluation and dataset tooling; the two Isaac-GR00T patches\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Session recordings, checkpoints and rollout videos:
+\href{https://drive.google.com/drive/folders/15QwIDUiLEHWsbQtJYkK7RNKXCdkpzGy3?usp=sharing}{Google
+Drive}.
 
 \end{document}

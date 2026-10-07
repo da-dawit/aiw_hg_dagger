@@ -14,17 +14,18 @@ can be rebuilt after a new session or checkpoint.
 
 `intervention_timeline.pdf` is drawn in TikZ; its source is in the session scratchpad.
 
-## Seven files are not here
+## Eight files are not here
 
 They are photographs, screen captures or diagrams that were not produced by these scripts, and the
 manual will not compile without them:
 
     session overview.png     ai_worker.png        ai_worker record.png
     leader_controls.png      overall_ui.png       trainingloss.png
-    hg-dagger.png
+    hg-dagger.png            success.png
 
 `ai_worker.png` and `ai_worker record.png` are the two architecture diagrams; the rest are photos,
-a training-loss plot and the HG-DAgger loop diagram.
+a training-loss plot and the HG-DAgger loop diagram;
+`success.png` is the photo of the seated bolt in the results section.
 
 Two of the names contain a space, which some TeX distributions handle and others do not. Renaming
 them to `session_overview.png` and `ai_worker_record.png`, and amending the two
